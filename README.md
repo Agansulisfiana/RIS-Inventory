@@ -1,57 +1,122 @@
-# RIS Gudang - Manajemen Stok & Inventaris Gudang
+# RIS Inventory
 
-Aplikasi manajemen stok dan inventaris gudang komprehensif yang dibangun menggunakan **React** dan **Vite**, dengan antarmuka modern menggunakan **Tailwind CSS**. Aplikasi ini dirancang untuk memudahkan operasional gudang dari hulu ke hilir, mulai dari penerimaan barang, penjualan, peminjaman demo unit, hingga pelaporan.
+Aplikasi inventory dan warehouse management berbasis web yang sedang berjalan untuk kebutuhan operasional PT. RIS. Aplikasi ini dibangun dengan React + Vite dan fokus pada pengelolaan stok, transaksi gudang, unit demo, hingga laporan dan ekspor dokumen.
 
-## ✨ Fitur Utama
+## Ringkasan aplikasi
 
-Aplikasi ini memiliki beberapa modul utama yang mendukung operasional gudang sehari-hari:
+Aplikasi ini sekarang berfungsi sebagai sistem manajemen gudang yang mencakup:
 
-*   **📊 Dashboard Bisnis**: Ringkasan metrik inventaris, grafik aktivitas gudang, dan notifikasi stok kritis. Tersedia juga fitur **TV Wallboard Mode** untuk ditampilkan di monitor gudang.
-*   **📦 Katalog & Stok Dijual**: Manajemen master produk, SKU, barcode, dan informasi stok barang secara real-time.
-*   **🛒 Penjualan (DO Keluar)**: Pembuatan Sales Order dan pencetakan Surat Jalan / Delivery Order (DO) otomatis mengurangi stok.
-*   **📥 Penerimaan Supplier (PO)**: Pencatatan tanda terima barang / Goods Receipt dari supplier yang secara otomatis menambah stok.
-*   **🔄 Mutasi Stok & Log**: Pencatatan seluruh riwayat keluar-masuk barang (pergerakan barang) lengkap dengan nama PIC.
-*   **📋 Stock Opname (Audit)**: Fitur untuk melakukan penyesuaian stok fisik dan sistem secara periodik, mendukung draft dan approval.
-*   **🎬 Pusat Unit Demo (POC)**: Manajemen peminjaman dan pengembalian barang demo ke pelanggan/customer (Demo Out / Demo In).
-*   **🔧 Service & Maintenance**: Modul untuk melacak tiket perbaikan barang atau unit yang rusak, lengkap dengan status pengerjaan.
-*   **📄 Pusat Laporan & Ekspor**: Cetak dan ekspor laporan inventaris secara lengkap.
-*   **👥 Kelola Pengguna**: Manajemen hak akses pengguna (Admin, Sales, Warehouse Staff, dll).
-*   **📷 Barcode Scanner**: Dukungan pemindaian barcode terintegrasi menggunakan kamera perangkat untuk pencarian dan stock opname yang lebih cepat.
+- dashboard overview dan ringkasan operasional
+- katalog produk / master item inventory
+- penjualan dan DO keluar
+- penerimaan barang / goods receipt
+- mutasi stok antar lokasi
+- stock opname / audit stok
+- manajemen unit demo dan peminjaman pelanggan
+- service / maintenance ticket
+- laporan inventaris dan ekspor PDF/Excel
+- pengaturan sistem, user, dan role access
+- mode wallboard publik untuk display TV
+- barcode scanner untuk pencarian dan verifikasi item
 
-## 🛠️ Teknologi yang Digunakan
+## Fitur utama yang aktif
 
-*   **Framework**: React 19 + Vite
-*   **Styling**: Tailwind CSS v4
-*   **Icons**: Lucide React
-*   **Charts**: Recharts
-*   **Animations**: Motion
-*   **Utility & Ekspor**: jsPDF (untuk ekspor PDF), XLSX (untuk ekspor Excel)
-*   **Barcode**: HTML5-QRCode
-*   **AI Integration**: Google GenAI (berpotensi untuk fitur cerdas ke depan)
+### 1. Dashboard & TV Wallboard
+- Tampilan dashboard operasional dengan ringkasan inventory
+- Versi public dashboard untuk ditampilkan di TV / monitor wallboard
+- Mode publik dapat diakses dengan parameter URL seperti:
+  - `?view=public-dashboard`
+  - atau hash `#public-dashboard`
 
-## 🚀 Cara Menjalankan (Run Locally)
+### 2. Product & Inventory Management
+- Menambah, mengedit, dan melihat daftar produk
+- Informasi item seperti SKU, serial number, brand, lokasi, dan stok per warehouse
+- Detail item per unit lengkap dengan histori / status stok
 
-**Prasyarat:** Pastikan Anda telah menginstal Node.js di sistem Anda.
+### 3. Sales Orders & Goods Receipt
+- Modul sales order untuk transaksi keluar barang
+- Modul penerimaan barang dari supplier / receipt
+- Proses transaksi otomatis memengaruhi stok dan data ledger
 
-1.  **Clone atau unduh** repositori ini ke komputer lokal Anda.
-2.  Buka terminal/Command Prompt dan arahkan ke direktori proyek.
-3.  **Install dependensi** dengan menjalankan perintah:
-    ```bash
-    npm install
-    ```
-4.  *(Opsional)* Jika ada fitur yang membutuhkan Gemini API, atur `GEMINI_API_KEY` di dalam file `.env.local`. Anda bisa menyalin dari `.env.example` jika tersedia.
-5.  **Jalankan aplikasi** di mode development:
-    ```bash
-    npm run dev
-    ```
-6.  Buka browser dan akses alamat yang tertera di terminal (biasanya `http://localhost:3000`).
+### 4. Stock Movement & Audit
+- Pergerakan stok antar lokasi / warehouse
+- Log transaksi stok lengkap dengan PIC dan catatan waktu
+- Stock opname untuk proses audit dan koreksi stok fisik
 
-## 📁 Struktur Direktori Utama
+### 5. Unit Demo Center
+- Peminjaman unit demo ke pelanggan
+- Checkout / pengeluaran unit demo
+- Pengembalian unit demo (check-in)
+- Pembuatan surat peminjaman unit demo dalam format PDF siap save/print
+- Dokumen bisa dibuka kembali dari list demo yang aktif
 
-*   `src/components/`: Kumpulan komponen UI terpisah berdasarkan modul (Dashboard, Products, Sales, dll).
-*   `src/services/`: Logika layanan bisnis dan integrasi penyimpanan data (seperti `storageService`).
-*   `src/types.ts`: Definisi tipe data TypeScript untuk aplikasi (InventoryItem, SalesOrder, dll).
+### 6. Service & Maintenance
+- Tracking tiket service untuk unit yang bermasalah
+- Status perbaikan dan penanganan unit
 
-## 📄 Lisensi
+### 7. Reports & Export
+- Laporan inventaris dan transaksi
+- Ekspor data ke PDF dan Excel
+- Dokumen formal seperti surat peminjaman unit demo dibuat dalam format profesional dengan branding RIS
 
-Hak cipta dilindungi. Penggunaan aplikasi ini ditujukan untuk kebutuhan internal perusahaan.
+### 8. Users & Permission
+- Login berdasarkan user
+- Role-based access control untuk mengatur izin fitur
+- Fitur sensitif dibatasi sesuai role user
+
+## Teknologi utama
+
+- React 19
+- Vite
+- TypeScript
+- Tailwind CSS
+- Lucide React
+- Recharts
+- Motion
+- jsPDF + jspdf-autotable
+- XLSX
+- html5-qrcode
+- localStorage-based persistence untuk data aplikasi
+
+## Struktur proyek utama
+
+- `src/App.tsx` — entry aplikasi dan state utama
+- `src/components/` — modul UI berdasarkan fungsi (dashboard, sales, demo, reports, settings, dll)
+- `src/services/` — logic pengelolaan data, storage, dan export PDF
+- `src/utils/` — helper seperti permission, barcode, print, dan utility bisnis
+- `src/types.ts` — definisi tipe data utama
+- `tests/` — uji regresi untuk fitur utama
+
+## Cara menjalankan lokal
+
+Persyaratan:
+- Node.js terbaru
+
+Langkah:
+
+```bash
+npm install
+npm run dev
+```
+
+Setelah server aktif, buka URL yang muncul di terminal, biasanya:
+
+```text
+http://localhost:3000
+```
+
+## Build untuk production
+
+```bash
+npm run build
+```
+
+## Catatan aplikasi
+
+- Data aplikasi saat ini disimpan di browser/localStorage sehingga cocok untuk demo dan penggunaan internal.
+- Aplikasi telah dirancang untuk kebutuhan warehouse dan inventory PT. RIS, termasuk modul demo unit dan dokumen formal untuk peminjaman barang.
+- Fitur ekspor PDF dan laporan sudah dibuat untuk kebutuhan print/save dokumen perusahaan.
+
+## Lisensi
+
+Aplikasi ini dibuat untuk kebutuhan internal operasional perusahaan dan tidak ditujukan untuk publikasi umum tanpa izin.

@@ -38,6 +38,7 @@ import {
 } from 'recharts';
 import { InventoryItem, StockTransaction, WarehouseSettings, User } from '../../types';
 import { storageService } from '../../services/storage';
+import { getInventoryStockState } from '../../utils/inventoryStock';
 import { RisLogo } from '../Common/RisLogo';
 
 interface PublicDashboardViewProps {
@@ -173,11 +174,28 @@ export const PublicDashboardView: React.FC<PublicDashboardViewProps> = ({
   const maintenanceItems = items.filter(isMaintenanceItem);
   const brokenItems = items.filter(isBrokenItem);
 
-  const totalInWarehouseQuantity = inWarehouseItems.reduce((acc, curr) => acc + Math.max(0, curr.quantity), 0);
+  const stockBreakdown = items
+    .filter(item => item.quantity > 0 || (item.demoLoanInfo && item.demoLoanInfo.active))
+    .map(item => {
+      const stock = getInventoryStockState(item);
+      return {
+        id: item.id,
+        name: item.name,
+        sku: item.sku,
+        unit: item.unit || 'unit',
+        totalQuantity: Math.max(0, item.quantity),
+        readyQuantity: stock.readyQuantity,
+        demoQuantity: stock.demoQuantity,
+        location: item.location
+      };
+    })
+    .sort((a, b) => (b.readyQuantity + b.demoQuantity) - (a.readyQuantity + a.demoQuantity));
+
+  const totalInWarehouseQuantity = stockBreakdown.reduce((acc, curr) => acc + curr.readyQuantity, 0);
   const totalDemoQuantity = demoLoanedItems.reduce((acc, curr) => acc + Math.max(0, curr.demoLoanInfo?.quantity ?? curr.quantity), 0);
   const totalValuation = items.reduce((acc, curr) => acc + (Math.max(0, curr.quantity) * (curr.unitPrice ?? curr.price)), 0);
 
-  const lowStockItems = items.filter(item => isInWarehouseItem(item) && item.quantity <= item.minStock);
+  const lowStockItems = items.filter(item => isInWarehouseItem(item) && getInventoryStockState(item).readyQuantity <= item.minStock);
   const overdueDemoItems = items.filter(item => {
     if (!isDemoItem(item) || !item.demoLoanInfo) return false;
     return new Date() > new Date(item.demoLoanInfo.expectedReturnDate);
@@ -213,102 +231,96 @@ export const PublicDashboardView: React.FC<PublicDashboardViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.18),transparent_28%),linear-gradient(180deg,#0b1120_0%,#020817_100%)] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
-      {/* Top TV/Public Header Banner */}
-      <header className="bg-slate-900/80 border-b border-slate-700/70 px-4 sm:px-6 py-3.5 sticky top-0 z-40 backdrop-blur-xl shadow-[0_10px_30px_rgba(15,23,42,0.35)]">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          
-          {/* Brand & Warehouse Status */}
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
-            <div className="flex items-center gap-2.5">
-              <RisLogo size={36} />
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_30%),linear-gradient(180deg,#0b1120_0%,#020817_100%)] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+      <header className="sticky top-0 z-40 border-b border-slate-700/70 bg-slate-950/75 px-4 py-3.5 shadow-[0_18px_42px_rgba(2,6,23,0.45)] backdrop-blur-2xl sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 sm:flex-row">
+          <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-start">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl border border-blue-400/30 bg-blue-500/10 p-2 shadow-[0_0_24px_rgba(59,130,246,0.22)]">
+                <RisLogo size={30} />
+              </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="font-heading font-black text-base text-white tracking-[-0.04em] leading-none">
+                  <h1 className="font-heading text-base font-black leading-none tracking-[-0.04em] text-white">
                     RIS Inventory
                   </h1>
-                  <span className="bg-blue-500/15 text-blue-300 border border-blue-500/35 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono uppercase tracking-[0.12em]">
-                    Produk & Demo Unit
+                  <span className="rounded-full border border-blue-500/35 bg-blue-500/15 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-blue-300">
+                    TV Wallboard
                   </span>
                 </div>
-                <p className="text-xs text-slate-300 font-medium truncate max-w-[240px] sm:max-w-xs mt-0.5 tracking-[0.02em]">
+                <p className="mt-0.5 max-w-[240px] truncate text-xs font-medium tracking-[0.02em] text-slate-300 sm:max-w-xs">
                   {settings.companyName} • {settings.warehouseName}
                 </p>
               </div>
             </div>
 
-            {/* Live Indicator Mobile */}
-            <div className="flex sm:hidden items-center gap-1.5 px-2.5 py-1 bg-emerald-950/80 border border-emerald-500/30 rounded-full">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span className="text-[10px] font-bold text-emerald-400 uppercase font-mono">LIVE</span>
+            <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 sm:hidden">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-300">LIVE</span>
             </div>
           </div>
 
-          {/* Center Clock & Auto-Refresh Progress */}
-          <div className="flex items-center gap-3 bg-slate-950/70 border border-slate-700/80 px-3.5 py-1.5 rounded-xl text-xs font-mono shadow-inner shadow-slate-900/70">
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-700/80 bg-slate-950/80 px-3.5 py-1.5 text-xs font-mono shadow-inner shadow-slate-900/80">
             <div className="flex items-center gap-2 text-slate-300">
-              <Clock className="w-3.5 h-3.5 text-blue-400" />
-              <span className="font-bold text-white tracking-[0.08em]">
+              <Clock className="h-3.5 w-3.5 text-blue-400" />
+              <span className="font-bold tracking-[0.08em] text-white">
                 {currentTime.toLocaleTimeString('id-ID', { hour12: false })} WIB
               </span>
-              <span className="text-slate-400 text-[10px] hidden md:inline">
+              <span className="hidden text-[10px] text-slate-400 md:inline">
                 • {formatDateIndo(currentTime)}
               </span>
             </div>
 
-            <div className="h-3.5 w-px bg-slate-800 hidden sm:block" />
+            <div className="hidden h-3.5 w-px bg-slate-800 sm:block" />
 
-            {/* Auto refresh timer */}
             <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-              <RefreshCw className={`w-3 h-3 text-slate-400 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
-              <span>Refresh: <strong className="text-blue-400 font-bold">{refreshCountdown}s</strong></span>
+              <RefreshCw className={`h-3 w-3 text-slate-400 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
+              <span>
+                Refresh: <strong className="font-bold text-blue-400">{refreshCountdown}s</strong>
+              </span>
             </div>
           </div>
 
-          {/* Action Toolbar */}
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            {/* Share Public Link Button */}
+          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={copyPublicLink}
               title="Salin Link Dashboard Publik untuk Layar TV atau Pihak Manajemen"
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all border cursor-pointer ${
-                copiedLink 
-                  ? 'bg-emerald-600 text-white border-emerald-500' 
-                  : 'bg-slate-800 hover:bg-slate-750 text-slate-200 border-slate-700 hover:border-slate-600'
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                copiedLink
+                  ? 'border-emerald-500 bg-emerald-600 text-white'
+                  : 'border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-600 hover:bg-slate-800'
               }`}
             >
-              {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5 text-blue-400" />}
+              {copiedLink ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5 text-blue-400" />}
               <span>{copiedLink ? 'Link Tersalin!' : 'Salin Link'}</span>
             </motion.button>
 
-            {/* Fullscreen Mode Button */}
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={toggleFullScreen}
-              title={isFullScreen ? "Keluar Layar Penuh" : "Mode TV Layar Penuh"}
-              className="p-1.5 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition-colors cursor-pointer"
+              title={isFullScreen ? 'Keluar Layar Penuh' : 'Mode TV Layar Penuh'}
+              className="rounded-xl border border-slate-700 bg-slate-900 p-1.5 text-slate-300 transition-colors hover:border-slate-600 hover:text-white cursor-pointer"
             >
-              {isFullScreen ? <Minimize2 className="w-4 h-4 text-blue-400" /> : <Maximize2 className="w-4 h-4" />}
+              {isFullScreen ? <Minimize2 className="h-4 w-4 text-blue-400" /> : <Maximize2 className="h-4 w-4" />}
             </motion.button>
 
-            {/* Back to Management / Login App */}
             {currentUser ? (
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={onExitPublicMode}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-blue-600/30 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-blue-600/30 transition-all hover:bg-blue-500 cursor-pointer"
               >
                 <span>Buka Aplikasi</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
+                <ArrowUpRight className="h-3.5 w-3.5" />
               </motion.button>
             ) : (
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={onOpenLogin}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-blue-600/30 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-blue-600/30 transition-all hover:bg-blue-500 cursor-pointer"
               >
-                <LogIn className="w-3.5 h-3.5" />
+                <LogIn className="h-3.5 w-3.5" />
                 <span>Login Petugas</span>
               </motion.button>
             )}
@@ -316,154 +328,145 @@ export const PublicDashboardView: React.FC<PublicDashboardViewProps> = ({
         </div>
       </header>
 
-      {/* Main Wallboard Canvas */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        
-        {/* Live Status Bar & Alert Ribbon */}
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-900/60 border border-slate-800/80 rounded-2xl">
-          <div className="flex items-center gap-2.5">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-            </span>
-            <span className="text-xs font-bold text-slate-200 tracking-wide font-heading uppercase">
-              Live Real-Time Warehouse Telemetry
-            </span>
-            <span className="text-[11px] text-slate-400 font-mono hidden md:inline">
-              | Sinkronisasi lokal instan & pelacakan demo unit aktif
-            </span>
-          </div>
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6">
+        <div className="relative overflow-hidden rounded-[28px] border border-slate-800/80 bg-[radial-gradient(circle_at_left,rgba(59,130,246,0.22),transparent_30%),linear-gradient(135deg,#0f172a_0%,#111827_38%,#0b1120_100%)] p-4 shadow-[0_30px_80px_rgba(15,23,42,0.45)] sm:p-6">
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(148,163,184,0.07),transparent)] opacity-80" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-3 w-3">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+                </span>
+                <span className="font-heading text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300">
+                  Real-time Operations Center
+                </span>
+              </div>
+              <div>
+                <h2 className="font-heading text-2xl font-black tracking-[-0.06em] text-white sm:text-3xl">
+                  Warehouse Command Dashboard
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm text-slate-300">
+                  Live monitoring stok fisik, demo unit, status pengiriman, dan kondisi aset di seluruh gudang.
+                </p>
+              </div>
+            </div>
 
-          <div className="flex items-center gap-2">
-            {lowStockItems.length > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium rounded-lg">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                <span>{lowStockItems.length} SKU Stok Kritis</span>
-              </span>
-            )}
-            {overdueDemoItems.length > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium rounded-lg">
-                <Clock className="w-3.5 h-3.5 text-rose-400" />
-                <span>{overdueDemoItems.length} Demo Jatuh Tempo</span>
-              </span>
-            )}
-            {lowStockItems.length === 0 && overdueDemoItems.length === 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium rounded-lg">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Semua Stok & Unit Terkendali</span>
-              </span>
-            )}
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              {lowStockItems.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-300">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+                  {lowStockItems.length} SKU Stok Kritis
+                </span>
+              )}
+              {overdueDemoItems.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-medium text-rose-300">
+                  <Clock className="h-3.5 w-3.5 text-rose-400" />
+                  {overdueDemoItems.length} Demo Jatuh Tempo
+                </span>
+              )}
+              {lowStockItems.length === 0 && overdueDemoItems.length === 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Semua Kondisi Optimal
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* 5-Card KPI Bento Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
-          
-          {/* KPI 1: Total Valuation */}
-          <motion.div 
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5 sm:gap-4">
+          <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.05 }}
-            className="p-4 sm:p-5 bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950/60 border border-blue-500/25 hover:border-blue-400/50 rounded-2xl space-y-2 shadow-[0_12px_30px_rgba(30,64,175,0.15)] relative overflow-hidden group"
+            className="group relative overflow-hidden rounded-2xl border border-blue-500/25 bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950/60 p-4 shadow-[0_20px_34px_rgba(30,64,175,0.14)] sm:p-5"
           >
-            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-400/80 to-transparent" />
+            <div className="flex items-center justify-between text-xs font-medium text-slate-400">
               <span>Total Nilai Aset Stok</span>
-              <div className="w-7 h-7 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-400">
-                <Sparkles className="w-4 h-4" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                <Sparkles className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-xl sm:text-2xl font-black font-heading text-white tracking-tight">
-              {formatRupiah(totalValuation)}
-            </div>
-            <div className="text-[11px] text-slate-400 font-mono">
-              Dari total {totalSkuCount} SKU terdaftar
-            </div>
+            <div className="mt-4 text-xl font-black tracking-tight text-white sm:text-2xl">{formatRupiah(totalValuation)}</div>
+            <div className="mt-2 text-[11px] font-mono text-slate-400">Dari total {totalSkuCount} SKU terdaftar</div>
           </motion.div>
 
-          {/* KPI 2: Total Units In Warehouse */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
-            className="p-4 sm:p-5 bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-2xl space-y-2 shadow-lg relative overflow-hidden"
+            className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-lg sm:p-5"
           >
-            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+            <div className="flex items-center justify-between text-xs font-medium text-slate-400">
               <span>Stok Fisik di Gudang</span>
-              <div className="w-7 h-7 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-400">
-                <Package className="w-4 h-4" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                <Package className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-xl sm:text-2xl font-black font-heading text-white tracking-tight flex items-baseline gap-1.5">
+            <div className="mt-4 flex items-baseline gap-1.5 text-xl font-black tracking-tight text-white sm:text-2xl">
               <span>{totalInWarehouseQuantity}</span>
               <span className="text-xs font-normal text-slate-400">unit</span>
             </div>
-            <div className="text-[11px] text-emerald-400 font-medium">
-              {inWarehouseItems.length} SKU siap didistribusikan
-            </div>
+            <div className="mt-2 text-[11px] font-medium text-emerald-400">{inWarehouseItems.length} SKU siap didistribusikan</div>
           </motion.div>
 
-          {/* KPI 3: Demo Unit Active */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.15 }}
-            className="p-4 sm:p-5 bg-slate-900/90 border border-amber-500/20 hover:border-amber-500/40 rounded-2xl space-y-2 shadow-lg relative overflow-hidden"
+            className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-slate-900/90 p-4 shadow-lg sm:p-5"
           >
-            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+            <div className="flex items-center justify-between text-xs font-medium text-slate-400">
               <span>Demo Unit Dipinjam</span>
-              <div className="w-7 h-7 bg-amber-500/10 rounded-lg flex items-center justify-center text-amber-400">
-                <UserCheck className="w-4 h-4" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
+                <UserCheck className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-xl sm:text-2xl font-black font-heading text-amber-400 tracking-tight flex items-baseline gap-1.5">
+            <div className="mt-4 flex items-baseline gap-1.5 text-xl font-black tracking-tight text-amber-400 sm:text-2xl">
               <span>{totalDemoQuantity}</span>
               <span className="text-xs font-normal text-slate-400">unit</span>
             </div>
-            <div className="text-[11px] text-slate-400 font-mono">
-              {demoLoanedItems.length} produk di tangan sales/klien
-            </div>
+            <div className="mt-2 text-[11px] font-mono text-slate-400">{demoLoanedItems.length} produk di tangan sales/klien</div>
           </motion.div>
 
-          {/* KPI 4: Low Stock Alert */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
-            className="p-4 sm:p-5 bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-2xl space-y-2 shadow-lg relative overflow-hidden"
+            className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-lg sm:p-5"
           >
-            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+            <div className="flex items-center justify-between text-xs font-medium text-slate-400">
               <span>Peringatan Stok Tipis</span>
-              <div className="w-7 h-7 bg-rose-500/10 rounded-lg flex items-center justify-center text-rose-400">
-                <AlertTriangle className="w-4 h-4" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500/10 text-rose-400">
+                <AlertTriangle className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-xl sm:text-2xl font-black font-heading text-rose-400 tracking-tight flex items-baseline gap-1.5">
+            <div className="mt-4 flex items-baseline gap-1.5 text-xl font-black tracking-tight text-rose-400 sm:text-2xl">
               <span>{lowStockItems.length}</span>
               <span className="text-xs font-normal text-slate-400">SKU</span>
             </div>
-            <div className="text-[11px] text-slate-400">
-              Perlu segera restock/inbound
-            </div>
+            <div className="mt-2 text-[11px] text-slate-400">Perlu segera restock/inbound</div>
           </motion.div>
 
-          {/* KPI 5: Capacity Occupancy */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.25 }}
-            className="p-4 sm:p-5 bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-2xl space-y-2 shadow-lg relative overflow-hidden"
+            className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-lg sm:p-5"
           >
-            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+            <div className="flex items-center justify-between text-xs font-medium text-slate-400">
               <span>Okupansi Kapasitas</span>
-              <div className="w-7 h-7 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-400">
-                <Building2 className="w-4 h-4" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                <Building2 className="h-4 w-4" />
               </div>
             </div>
-            <div className="text-xl sm:text-2xl font-black font-heading text-white tracking-tight flex items-baseline gap-1.5">
+            <div className="mt-4 flex items-baseline gap-1.5 text-xl font-black tracking-tight text-white sm:text-2xl">
               <span>{warehouseOccupancy}%</span>
             </div>
-            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden mt-1">
-              <div 
+            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+              <div
                 className={`h-full rounded-full transition-all duration-500 ${
                   warehouseOccupancy > 85 ? 'bg-rose-500' : warehouseOccupancy > 65 ? 'bg-amber-500' : 'bg-blue-500'
                 }`}
@@ -473,67 +476,102 @@ export const PublicDashboardView: React.FC<PublicDashboardViewProps> = ({
           </motion.div>
         </div>
 
-        {/* Middle Section: Demo Units Board & Status Distribution Chart */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          
-          {/* Active Demo Loans Board (7 Cols) */}
-          <motion.div 
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.25 }}
+          className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl"
+        >
+          <div className="mb-4 flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-blue-400" />
+              <h3 className="font-heading text-sm font-bold text-white">Rincian Sisa Stok per Unit & Qty</h3>
+            </div>
+            <span className="font-mono text-[11px] text-slate-400">{stockBreakdown.length} SKU terdata</span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {stockBreakdown.map((entry) => (
+              <div key={entry.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="truncate text-xs font-bold text-white">{entry.name}</div>
+                  <span className="rounded-full border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] text-blue-300">
+                    {entry.sku}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-300">
+                  <div className="rounded-lg border border-slate-800 bg-slate-900 p-2">
+                    <div className="text-slate-500">Ready</div>
+                    <div className="mt-1 font-bold text-emerald-300">{entry.readyQuantity} {entry.unit}</div>
+                  </div>
+                  <div className="rounded-lg border border-slate-800 bg-slate-900 p-2">
+                    <div className="text-slate-500">Demo</div>
+                    <div className="mt-1 font-bold text-amber-300">{entry.demoQuantity} {entry.unit}</div>
+                  </div>
+                  <div className="rounded-lg border border-slate-800 bg-slate-900 p-2">
+                    <div className="text-slate-500">Total</div>
+                    <div className="mt-1 font-bold text-white">{entry.totalQuantity} {entry.unit}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+          <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.3 }}
-            className="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl"
+            className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl lg:col-span-7"
           >
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-amber-400" />
-                <h3 className="font-heading font-bold text-white text-sm">
-                  Pelacakan Demo Unit yang Sedang Dipinjam
-                </h3>
+                <UserCheck className="h-4 w-4 text-amber-400" />
+                <h3 className="font-heading text-sm font-bold text-white">Pelacakan Demo Unit yang Sedang Dipinjam</h3>
               </div>
-              <span className="text-xs font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md">
+              <span className="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 font-mono text-xs text-amber-400">
                 {demoLoanedItems.length} Unit Di Luar
               </span>
             </div>
 
             {demoLoanedItems.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-xs">
+              <div className="p-8 text-center text-xs text-slate-500">
                 Tidak ada demo unit yang sedang dipinjam saat ini. Semua unit berada aman di gudang.
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[360px] overflow-y-auto pr-1">
+              <div className="mt-4 grid max-h-[360px] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
                 {demoLoanedItems.map((item) => {
                   const isOverdue = item.demoLoanInfo && new Date() > new Date(item.demoLoanInfo.expectedReturnDate);
                   return (
-                    <div 
+                    <div
                       key={item.id}
-                      className={`p-3.5 rounded-xl border transition-all ${
-                        isOverdue 
-                          ? 'bg-rose-950/30 border-rose-500/40 shadow-sm' 
-                          : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                      className={`rounded-xl border p-3.5 transition-all ${
+                        isOverdue ? 'border-rose-500/40 bg-rose-950/30 shadow-sm' : 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2 mb-1.5">
-                        <div className="font-bold text-xs text-white truncate">{item.name}</div>
-                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                      <div className="mb-1.5 flex items-start justify-between gap-2">
+                        <div className="truncate text-xs font-bold text-white">{item.name}</div>
+                        <span className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold ${
                           isOverdue ? 'bg-rose-500 text-white' : 'bg-amber-500/20 text-amber-300'
                         }`}>
                           {isOverdue ? 'JATUH TEMPO' : 'DIPINJAM'}
                         </span>
                       </div>
 
-                      <div className="text-[11px] text-slate-400 font-mono mb-2">
+                      <div className="mb-2 font-mono text-[11px] text-slate-400">
                         SKU: <strong className="text-slate-300">{item.sku}</strong> • Lokasi: {item.location}
                       </div>
 
                       {item.demoLoanInfo && (
-                        <div className="space-y-1 text-[11px] bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+                        <div className="space-y-1 rounded-lg border border-slate-800 bg-slate-900/90 p-2 text-[11px]">
                           <div className="flex justify-between">
                             <span className="text-slate-500">Peminjam:</span>
                             <span className="font-semibold text-slate-200">{item.demoLoanInfo.borrowerName}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-500">Tujuan:</span>
-                            <span className="text-slate-300 truncate max-w-[140px]">{item.demoLoanInfo.purpose}</span>
+                            <span className="max-w-[140px] truncate text-slate-300">{item.demoLoanInfo.purpose}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-500">Est. Kembali:</span>
@@ -550,23 +588,18 @@ export const PublicDashboardView: React.FC<PublicDashboardViewProps> = ({
             )}
           </motion.div>
 
-          {/* Status Breakdown Chart (5 Cols) */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.35 }}
-            className="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl flex flex-col justify-between"
+            className="flex flex-col justify-between rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl lg:col-span-5"
           >
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-heading font-bold text-white text-sm">
-                Distribusi Kondisi & Status Stok
-              </h3>
-              <span className="text-[11px] text-slate-400 font-mono">
-                Total {items.reduce((acc, c) => acc + c.quantity, 0)} Unit
-              </span>
+              <h3 className="font-heading text-sm font-bold text-white">Distribusi Kondisi & Status Stok</h3>
+              <span className="font-mono text-[11px] text-slate-400">Total {items.reduce((acc, c) => acc + c.quantity, 0)} Unit</span>
             </div>
 
-            <div className="h-44 w-full flex items-center justify-center">
+            <div className="flex h-44 w-full items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -582,85 +615,80 @@ export const PublicDashboardView: React.FC<PublicDashboardViewProps> = ({
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#0f172a', 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#0f172a',
                       borderColor: '#334155',
                       borderRadius: '8px',
                       fontSize: '12px',
-                      color: '#fff' 
+                      color: '#fff'
                     }}
                   />
                 </PieChart>
               </ResponsiveContainer>
             </div>
 
-            {/* Custom Legend */}
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-xs">
+            <div className="grid grid-cols-2 gap-2 border-t border-slate-800 pt-2 text-xs">
               {statusDistributionData.map((d) => (
-                <div key={d.name} className="flex items-center justify-between p-1.5 bg-slate-950/50 rounded-lg border border-slate-800/80">
+                <div key={d.name} className="flex items-center justify-between rounded-lg border border-slate-800/80 bg-slate-950/50 p-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
-                    <span className="text-slate-300 text-[11px] truncate">{d.name}</span>
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: d.color }} />
+                    <span className="truncate text-[11px] text-slate-300">{d.name}</span>
                   </div>
-                  <span className="font-bold text-white font-mono">{d.value}</span>
+                  <span className="font-mono font-bold text-white">{d.value}</span>
                 </div>
               ))}
             </div>
           </motion.div>
         </div>
 
-        {/* Bottom Section: Real-Time Recent Transactions Feed */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: 0.4 }}
-          className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-3.5 shadow-xl"
+          className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl"
         >
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
-              <Radio className="w-4 h-4 text-blue-400 animate-pulse" />
-              <h3 className="font-heading font-bold text-white text-sm">
-                Feed Aktivitas Mutasi Terkini Gudang
-              </h3>
+              <Radio className="h-4 w-4 animate-pulse text-blue-400" />
+              <h3 className="font-heading text-sm font-bold text-white">Feed Aktivitas Mutasi Terkini Gudang</h3>
             </div>
-            <span className="text-xs text-slate-400 font-mono">
-              Live Stream
-            </span>
+            <span className="font-mono text-xs text-slate-400">Live Stream</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
             {transactions.slice(0, 4).map((tx) => {
               const isInbound = tx.type === 'inbound';
               const isOutbound = tx.type === 'outbound';
-              const isDemo = tx.type === 'demo_loan' || tx.type === 'demo_return';
 
               return (
-                <div 
-                  key={tx.id} 
-                  className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-1.5 hover:border-slate-700 transition-colors"
+                <div
+                  key={tx.id}
+                  className="space-y-1.5 rounded-xl border border-slate-800 bg-slate-950/60 p-3 transition-colors hover:border-slate-700"
                 >
                   <div className="flex items-center justify-between">
-                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded uppercase flex items-center gap-1 ${
-                      isInbound 
-                        ? 'bg-emerald-500/20 text-emerald-300' 
-                        : isOutbound 
-                        ? 'bg-rose-500/20 text-rose-300' 
-                        : 'bg-amber-500/20 text-amber-300'
+                    <span className={`flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase ${
+                      isInbound
+                        ? 'bg-emerald-500/20 text-emerald-300'
+                        : isOutbound
+                          ? 'bg-rose-500/20 text-rose-300'
+                          : 'bg-amber-500/20 text-amber-300'
                     }`}>
-                      {isInbound && <ArrowDownLeft className="w-3 h-3" />}
-                      {isOutbound && <ArrowUpRight className="w-3 h-3" />}
+                      {isInbound && <ArrowDownLeft className="h-3 w-3" />}
+                      {isOutbound && <ArrowUpRight className="h-3 w-3" />}
                       <span>{tx.type.replace('_', ' ')}</span>
                     </span>
-                    <span className="text-[10px] text-slate-500 font-mono">
+                    <span className="font-mono text-[10px] text-slate-500">
                       {new Date(tx.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
 
-                  <div className="text-xs font-bold text-white truncate">{tx.itemName}</div>
-                  <div className="text-[11px] text-slate-400 font-mono flex justify-between">
-                    <span>Jumlah: <strong className="text-slate-200">{tx.quantity} unit</strong></span>
-                    <span className="text-slate-500 truncate max-w-[90px]">{tx.performedBy}</span>
+                  <div className="truncate text-xs font-bold text-white">{tx.itemName}</div>
+                  <div className="flex justify-between font-mono text-[11px] text-slate-400">
+                    <span>
+                      Jumlah: <strong className="text-slate-200">{tx.quantity} unit</strong>
+                    </span>
+                    <span className="max-w-[90px] truncate text-slate-500">{tx.performedBy}</span>
                   </div>
                 </div>
               );
@@ -668,23 +696,23 @@ export const PublicDashboardView: React.FC<PublicDashboardViewProps> = ({
           </div>
         </motion.div>
 
-        {/* Public Share Guidance Box */}
-        <div className="p-4 bg-gradient-to-r from-blue-950/30 via-slate-900 to-indigo-950/30 border border-blue-500/20 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+        <div className="flex flex-col items-center justify-between gap-3 rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-950/30 via-slate-900 to-indigo-950/30 p-4 text-xs sm:flex-row">
           <div className="flex items-center gap-2.5">
-            <Share2 className="w-4 h-4 text-blue-400 shrink-0" />
+            <Share2 className="h-4 w-4 shrink-0 text-blue-400" />
             <div className="text-slate-300">
               <strong>Tautan Layar Publik Aktif:</strong> Anda dapat menampilkan halaman ini di Smart TV gudang, monitor lobi, atau membagikan link ke pimpinan tanpa perlu login akun.
             </div>
           </div>
           <button
             onClick={copyPublicLink}
-            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="shrink-0 rounded-lg bg-blue-600 px-3.5 py-1.5 font-semibold text-white transition-colors hover:bg-blue-500 cursor-pointer"
           >
-            <Copy className="w-3.5 h-3.5" />
-            <span>{copiedLink ? 'Link Tersalin!' : 'Salin URL Layar Publik'}</span>
+            <span className="flex items-center gap-1.5">
+              <Copy className="h-3.5 w-3.5" />
+              {copiedLink ? 'Link Tersalin!' : 'Salin URL Layar Publik'}
+            </span>
           </button>
         </div>
-
       </main>
     </div>
   );

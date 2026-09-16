@@ -22,8 +22,16 @@ export interface DemoLoanInfo {
   quantity?: number;
   borrowerName: string;
   customerName?: string;
+  companyName?: string;
   borrowerContact: string;
   borrowerDepartment?: string;
+  contactEmail?: string;
+  requestFrom?: string;
+  productName?: string;
+  productCode?: string;
+  serialNumber?: string;
+  accessoriesNotes?: string;
+  loanPeriod?: string;
   loanDate: string;
   expectedReturnDate: string;
   actualReturnDate?: string;
@@ -32,6 +40,7 @@ export interface DemoLoanInfo {
   active: boolean;
   loanedBy: string;
   documentNumber?: string;
+  outgoingDocumentNumber?: string;
   signatureUrl?: string;
   damageNotes?: string;
   inspectionPhotos?: string[];

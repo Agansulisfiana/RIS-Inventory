@@ -341,20 +341,31 @@ export const DemoUnitsTab: React.FC<DemoUnitsTabProps> = ({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
                   {isLoaned ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReturnItem(item);
-                        setReturnLocation(item.location);
-                        setReturnCondition('bagus');
-                      }}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      Proses Retur ke Gudang (Real-Time)
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => exportService.exportDemoLoanReceiptPDF(item, item.demoLoanInfo, settings, { autoSave: false, autoPrint: true })}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Cetak Surat Peminjaman Demo"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-purple-600" />
+                        Cetak Surat Demo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReturnItem(item);
+                          setReturnLocation(item.location);
+                          setReturnCondition('bagus');
+                        }}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        Proses Retur ke Gudang (Real-Time)
+                      </button>
+                    </>
                   ) : (
                     <button
                       type="button"

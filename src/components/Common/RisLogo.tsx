@@ -25,8 +25,8 @@ export const RisLogo: React.FC<RisLogoProps> = ({
         src={risLogoImage}
         alt="Logo PT. Reycom Integrated Solusi"
         referrerPolicy="no-referrer"
-        style={{ width: dimension, height: dimension, minWidth: dimension, minHeight: dimension }}
-        className="object-contain aspect-square shrink-0 select-none transition-transform hover:scale-105 drop-shadow-xs"
+        style={{ height: dimension, width: 'auto', maxHeight: dimension }}
+        className="object-contain shrink-0 select-none transition-transform hover:scale-105 drop-shadow-xs"
       />
 
       {showText && (

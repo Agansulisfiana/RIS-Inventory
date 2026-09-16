@@ -40,7 +40,14 @@ import {
   AuditLog
 } from './types';
 import { storageService } from './services/storage';
+import { exportService } from './services/exportService';
 import { getPermissions } from './utils/permissions';
+import { 
+  triggerSuccessConfetti, 
+  triggerLogoCelebration, 
+  triggerClickParticles, 
+  playFeedbackSound 
+} from './utils/animation';
 
 // Component Views
 import { OverviewTab } from './components/Dashboard/OverviewTab';
@@ -112,11 +119,18 @@ export default function App() {
   const [globalSearch, setGlobalSearch] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
-  // Toast
-  const [toastMessage, setToastMessage] = useState<{ title: string; desc: string } | null>(null);
-  const showToast = (title: string, desc: string) => {
-    setToastMessage({ title, desc });
-    setTimeout(() => setToastMessage(null), 4000);
+  // Toast with Animation & Sound Feedback
+  const [toastMessage, setToastMessage] = useState<{ title: string; desc: string; isError?: boolean } | null>(null);
+  const showToast = (title: string, desc: string, isError: boolean = false) => {
+    const errorState = isError || title.toLowerCase().includes('gagal') || title.toLowerCase().includes('ditolak');
+    setToastMessage({ title, desc, isError: errorState });
+    if (!errorState) {
+      triggerSuccessConfetti();
+      playFeedbackSound('success');
+    } else {
+      playFeedbackSound('action');
+    }
+    setTimeout(() => setToastMessage(null), 4500);
   };
 
   const refreshData = () => {
@@ -307,45 +321,52 @@ export default function App() {
   };
 
   // Demo Operations
-  const handleCheckoutDemo = (itemId: string, info: any) => {
+  const handleCheckoutDemo = (itemId: string, info: any): boolean => {
     const it = items.find(i => i.id === itemId);
-    if (!it) return;
+    if (!it) return false;
     if (!permissions.canManageDemo) {
       showToast('Akses Ditolak', 'Anda tidak memiliki izin untuk meminjam unit demo.');
-      return;
+      return false;
     }
 
-    const updatedItem: InventoryItem = {
-      ...it,
-      status: 'tersedia',
-      location: `Customer: ${info.customerName}`,
-      pic: info.borrowerName,
-      demoLoanInfo: info,
-      lastUpdated: new Date().toISOString(),
-      updatedBy: currentUser?.name || 'Sales'
-    };
+    try {
+      const updatedItem: InventoryItem = {
+        ...it,
+        status: 'tersedia',
+        location: `Customer: ${info.customerName}`,
+        pic: info.borrowerName,
+        demoLoanInfo: info,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: currentUser?.name || 'Sales'
+      };
 
-    storageService.saveItem(updatedItem);
+      storageService.saveItem(updatedItem, currentUser || undefined);
 
-    storageService.addTransaction({
-      transactionNumber: info.documentNumber || `DO-DEMO-${Date.now().toString().slice(-5)}`,
-      timestamp: info.loanDate,
-      type: 'Demo Out',
-      itemId: it.id,
-      itemSku: it.sku,
-      serialNumber: it.serialNumber,
-      itemName: it.name,
-      fromLocation: it.location,
-      toLocation: `Customer: ${info.customerName}`,
-      quantity: info.quantity || 1,
-      pic: info.borrowerName,
-      status: 'On Demo',
-      notes: `Peminjaman demo: ${info.purpose}`,
-      customer: info.customerName
-    });
+      storageService.addTransaction({
+        transactionNumber: info.documentNumber || `DO-DEMO-${Date.now().toString().slice(-5)}`,
+        timestamp: info.loanDate,
+        type: 'Demo Out',
+        itemId: it.id,
+        itemSku: it.sku,
+        serialNumber: it.serialNumber,
+        itemName: it.name,
+        fromLocation: it.location,
+        toLocation: `Customer: ${info.customerName}`,
+        quantity: info.quantity || 1,
+        pic: info.borrowerName,
+        status: 'On Demo',
+        notes: `Peminjaman demo: ${info.purpose}`,
+        customer: info.customerName
+      });
 
-    refreshData();
-    showToast('Checkout Demo Berhasil', `${info.quantity || 1} ${it.unit} ${it.name} dipinjamkan ke ${info.customerName}.`);
+      refreshData();
+      showToast('Checkout Demo Berhasil', `${info.quantity || 1} ${it.unit} ${it.name} dipinjamkan ke ${info.customerName}. Tanda terima siap dibuat secara manual.`);
+      return true;
+    } catch (error) {
+      console.error('Checkout demo failed:', error);
+      showToast('Checkout Demo Gagal', 'Proses keluarkan unit demo gagal. Periksa izin akses dan data yang diisi.');
+      return false;
+    }
   };
 
   const handleCheckinDemo = (itemId: string, returnNotes: string, condition: string) => {
@@ -357,40 +378,45 @@ export default function App() {
       return;
     }
 
-    const prevCustomer = it.demoLoanInfo?.customerName || it.location;
+    try {
+      const prevCustomer = it.demoLoanInfo?.customerName || it.location;
 
-    const updatedItem: InventoryItem = {
-      ...it,
-      status: 'tersedia',
-      condition: condition as any,
-      location: 'Gudang Utama Jakarta - Rak A01',
-      pic: currentUser?.name || 'Admin',
-      demoLoanInfo: undefined,
-      notes: returnNotes ? `Pengembalian demo: ${returnNotes}` : it.notes,
-      lastUpdated: new Date().toISOString(),
-      updatedBy: currentUser?.name || 'Admin'
-    };
+      const updatedItem: InventoryItem = {
+        ...it,
+        status: 'tersedia',
+        condition: condition as any,
+        location: 'Gudang Utama Jakarta - Rak A01',
+        pic: currentUser?.name || 'Admin',
+        demoLoanInfo: undefined,
+        notes: returnNotes ? `Pengembalian demo: ${returnNotes}` : it.notes,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: currentUser?.name || 'Admin'
+      };
 
-    storageService.saveItem(updatedItem);
+      storageService.saveItem(updatedItem, currentUser || undefined);
 
-    storageService.addTransaction({
-      transactionNumber: `DI-DEMO-${Date.now().toString().slice(-5)}`,
-      timestamp: new Date().toISOString(),
-      type: 'Demo In',
-      itemId: it.id,
-      itemSku: it.sku,
-      serialNumber: it.serialNumber,
-      itemName: it.name,
-      fromLocation: prevCustomer,
-      toLocation: 'Gudang Utama Jakarta - Rak A01',
-      quantity: 1,
-      pic: currentUser?.name || 'Admin',
-      status: 'Selesai',
-      notes: `Pengembalian unit demo selesai. Kondisi: ${condition}. ${returnNotes}`
-    });
+      storageService.addTransaction({
+        transactionNumber: `DI-DEMO-${Date.now().toString().slice(-5)}`,
+        timestamp: new Date().toISOString(),
+        type: 'Demo In',
+        itemId: it.id,
+        itemSku: it.sku,
+        serialNumber: it.serialNumber,
+        itemName: it.name,
+        fromLocation: prevCustomer,
+        toLocation: 'Gudang Utama Jakarta - Rak A01',
+        quantity: 1,
+        pic: currentUser?.name || 'Admin',
+        status: 'Selesai',
+        notes: `Pengembalian unit demo selesai. Kondisi: ${condition}. ${returnNotes}`
+      });
 
-    refreshData();
-    showToast('Check-in Pengembalian Sukses', `Unit ${it.name} telah kembali ke Gudang Utama Jakarta.`);
+      refreshData();
+      showToast('Check-in Pengembalian Sukses', `Unit ${it.name} telah kembali ke Gudang Utama Jakarta.`);
+    } catch (error) {
+      console.error('Check-in demo failed:', error);
+      showToast('Check-in Demo Gagal', 'Proses pengembalian unit demo gagal. Periksa izin akses dan data yang diisi.');
+    }
   };
 
   // Login check
@@ -505,11 +531,18 @@ export default function App() {
           
           {/* Logo Brand Header */}
           <div className="h-16 border-b border-slate-200 px-4 flex items-center justify-between">
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div 
+              onClick={(e) => {
+                triggerLogoCelebration(e);
+                playFeedbackSound('click');
+              }}
+              className="flex items-center gap-2.5 min-w-0 cursor-pointer group active:scale-95 transition-transform"
+              title="Klik logo RIS untuk animasi!"
+            >
               <RisLogo size={isSidebarCollapsed ? 32 : 36} />
               {!isSidebarCollapsed && (
                 <div className="min-w-0">
-                  <span className="font-black font-heading text-slate-900 tracking-tight text-sm block leading-none truncate">
+                  <span className="font-black font-heading text-slate-900 tracking-tight text-sm block leading-none truncate group-hover:text-blue-600 transition-colors">
                     RIS Inventory
                   </span>
                   <span className="text-[9px] font-bold text-blue-600 tracking-wider uppercase truncate block mt-0.5">
@@ -968,6 +1001,36 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Global Interactive Animated Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9, rotateX: -20 }}
+            animate={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
+            exit={{ opacity: 0, y: 30, scale: 0.92, transition: { duration: 0.2 } }}
+            transition={{ type: 'spring', stiffness: 450, damping: 28 }}
+            className="fixed bottom-6 right-6 z-50 max-w-md bg-slate-900/95 text-white p-4 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-start gap-3 select-none"
+          >
+            <div className={`p-2 rounded-xl shrink-0 ${
+              toastMessage.isError 
+                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
+                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+            }`}>
+              {toastMessage.isError ? <AlertTriangle className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
+            </div>
+            <div className="min-w-0 flex-1 pr-1">
+              <h4 className="font-black text-sm font-heading tracking-tight">{toastMessage.title}</h4>
+              <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{toastMessage.desc}</p>
+            </div>
+            <button
+              onClick={() => setToastMessage(null)}
+              className="p-1 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

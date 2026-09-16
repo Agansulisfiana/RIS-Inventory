@@ -49,6 +49,11 @@ import {
 } from '../../types';
 import { RisLogo } from '../Common/RisLogo';
 import { formatCurrency } from '../../utils/currency';
+import { 
+  triggerClickParticles, 
+  triggerLogoCelebration, 
+  playFeedbackSound 
+} from '../../utils/animation';
 
 interface OverviewTabProps {
   items: InventoryItem[];
@@ -144,8 +149,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="flex items-start gap-4 max-w-2xl">
-            <div className="hidden sm:flex shrink-0 p-2.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 shadow-inner">
-              <RisLogo size={56} />
+            {/* Integrated Natural Frosted White Logo Emblem */}
+            <div 
+              onClick={(e) => {
+                triggerLogoCelebration(e);
+                playFeedbackSound('success');
+              }}
+              className="hidden sm:flex shrink-0 p-2.5 sm:p-3 bg-white/95 hover:bg-white rounded-2xl shadow-xl shadow-blue-950/40 border border-white/50 ring-4 ring-white/10 hover:ring-white/30 hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer group select-none relative overflow-hidden items-center justify-center"
+              title="Klik logo RIS untuk efek animasi perayaan!"
+            >
+              <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-white/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+              <RisLogo size={52} />
             </div>
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold backdrop-blur-xs">
@@ -163,12 +177,16 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             </div>
           </div>
 
-          {/* Quick Action Hub */}
+          {/* Quick Action Hub with Micro-interactions */}
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             {onOpenSalesModal && (
               <button
-                onClick={onOpenSalesModal}
-                className="px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-900/30 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+                onClick={(e) => {
+                  triggerClickParticles(e);
+                  playFeedbackSound('click');
+                  onOpenSalesModal();
+                }}
+                className="px-4 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-900/30 transition-all transform hover:-translate-y-0.5 cursor-pointer"
               >
                 <ShoppingCart className="w-4 h-4" />
                 <span>+ Buat Penjualan (DO)</span>
@@ -176,8 +194,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             )}
 
             <button
-              onClick={onAddNewProduct}
-              className="px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-900/30 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+              onClick={(e) => {
+                triggerClickParticles(e);
+                playFeedbackSound('click');
+                onAddNewProduct();
+              }}
+              className="px-4 py-3 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-900/30 transition-all transform hover:-translate-y-0.5 cursor-pointer"
             >
               <Package className="w-4 h-4" />
               <span>+ Tambah Produk Baru</span>
@@ -185,8 +207,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
             {onOpenReceiptModal && (
               <button
-                onClick={onOpenReceiptModal}
-                className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/30 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+                onClick={(e) => {
+                  triggerClickParticles(e);
+                  playFeedbackSound('click');
+                  onOpenReceiptModal();
+                }}
+                className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/30 transition-all transform hover:-translate-y-0.5 cursor-pointer"
               >
                 <ArrowDownLeft className="w-4 h-4" />
                 <span>+ Terima Barang (PO)</span>
