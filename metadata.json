@@ -1,0 +1,6 @@
+{
+  "name": "RIS Inventory produk dan demo unit",
+  "description": "Aplikasi manajemen inventory profesional, tracking demo unit, surat jalan check-out/check-in digital, service ticket maintenance, stock opname, dan laporan terintegrasi PT. Reycom Integrated Solusi.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
