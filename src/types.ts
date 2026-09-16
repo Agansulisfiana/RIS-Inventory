@@ -277,6 +277,11 @@ export interface WarehouseSettings {
   lowStockThresholdDefault?: number;
   demoLoanDurationDays?: number;
   enableSoundEffects?: boolean;
+  /**
+   * Optional admin PIN for protected actions (stored in plain text for simplicity).
+   * In production this should be hashed and secured.
+   */
+  adminPin?: string;
 }
 
 export interface BackupSnapshot {

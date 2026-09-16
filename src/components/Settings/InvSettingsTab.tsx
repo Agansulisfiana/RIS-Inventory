@@ -82,10 +82,17 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
 }) => {
   const [formData, setFormData] = useState<WarehouseSettings>({ ...settings });
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [pinForm, setPinForm] = useState({
+    currentPin: '',
+    newPin: '',
+    confirmPin: '',
+    resetConfirmed: false
+  });
+  const [pinMessage, setPinMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    storageService.saveSettings(formData);
+    storageService.saveSettings(formData, currentUser);
     storageService.addAuditLog({
       action: 'UPDATE_SETTINGS',
       module: 'system',
@@ -95,6 +102,60 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
     });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
+    onRefreshData();
+  };
+
+  const handlePinUpdate = () => {
+    const currentPin = formData.adminPin || '';
+    const enteredCurrentPin = pinForm.currentPin.trim();
+    const newPin = pinForm.newPin.trim();
+    const confirmPin = pinForm.confirmPin.trim();
+
+    if (!newPin || !confirmPin) {
+      setPinMessage({ type: 'error', text: 'PIN baru dan konfirmasi PIN wajib diisi.' });
+      return;
+    }
+
+    if (newPin.length < 4) {
+      setPinMessage({ type: 'error', text: 'PIN baru minimal 4 karakter.' });
+      return;
+    }
+
+    if (newPin !== confirmPin) {
+      setPinMessage({ type: 'error', text: 'Konfirmasi PIN baru tidak cocok.' });
+      return;
+    }
+
+    if (currentPin && enteredCurrentPin && enteredCurrentPin !== currentPin) {
+      setPinMessage({ type: 'error', text: 'PIN lama yang Anda masukkan salah.' });
+      return;
+    }
+
+    if (currentPin && !enteredCurrentPin && !pinForm.resetConfirmed) {
+      setPinMessage({ type: 'error', text: 'Masukkan PIN lama atau centang opsi reset jika Anda lupa PIN lama.' });
+      return;
+    }
+
+    const nextSettings: WarehouseSettings = {
+      ...formData,
+      adminPin: newPin
+    };
+
+    setFormData(nextSettings);
+    storageService.saveSettings(nextSettings, currentUser);
+    storageService.addAuditLog({
+      action: 'UPDATE_ADMIN_PIN',
+      module: 'system',
+      category: 'security',
+      details: currentPin ? 'Mengubah PIN keamanan admin' : 'Membuat PIN keamanan admin',
+      user: currentUser
+    });
+
+    setPinMessage({
+      type: 'success',
+      text: currentPin ? 'PIN admin berhasil diubah.' : 'PIN admin berhasil dibuat.'
+    });
+    setPinForm({ currentPin: '', newPin: '', confirmPin: '', resetConfirmed: false });
     onRefreshData();
   };
 
@@ -210,11 +271,142 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
           </div>
         </div>
 
+        {/* Security PIN */}
+        <div className="space-y-4 pt-4 border-t border-slate-100">
+          <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+            <Shield className="w-4 h-4 text-rose-600" />
+            <span>Keamanan — PIN Penghapusan Produk</span>
+          </h2>
+
+          <div className="bg-rose-50/60 border border-rose-200 rounded-xl p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-slate-900">PIN Keamanan Admin</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  Digunakan untuk validasi penghapusan produk dan tindakan sensitif.
+                </div>
+              </div>
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                formData.adminPin
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-slate-100 text-slate-500 border-slate-200'
+              }`}>
+                {formData.adminPin ? '🔒 PIN Aktif' : '🔓 Belum Diset'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">
+                    {formData.adminPin ? 'PIN Lama' : 'PIN Baru'}
+                  </label>
+                  <input
+                    type="password"
+                    value={pinForm.currentPin}
+                    onChange={(e) => setPinForm({ ...pinForm, currentPin: e.target.value })}
+                    placeholder={formData.adminPin ? 'Masukkan PIN lama' : 'PIN baru awal'}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-mono tracking-widest focus:ring-2 focus:ring-rose-400 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">PIN Baru</label>
+                  <input
+                    type="password"
+                    value={pinForm.newPin}
+                    onChange={(e) => setPinForm({ ...pinForm, newPin: e.target.value })}
+                    placeholder="Masukkan PIN baru"
+                    maxLength={20}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-mono tracking-widest focus:ring-2 focus:ring-rose-400 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Konfirmasi PIN Baru</label>
+                  <input
+                    type="password"
+                    value={pinForm.confirmPin}
+                    onChange={(e) => setPinForm({ ...pinForm, confirmPin: e.target.value })}
+                    placeholder="Ulangi PIN baru"
+                    maxLength={20}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-mono tracking-widest focus:ring-2 focus:ring-rose-400 focus:outline-none"
+                  />
+                </div>
+
+                {formData.adminPin && (
+                  <label className="flex items-center gap-2 text-[11px] text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={pinForm.resetConfirmed}
+                      onChange={(e) => setPinForm({ ...pinForm, resetConfirmed: e.target.checked })}
+                      className="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                    />
+                    Saya lupa PIN lama dan ingin reset PIN keamanan.
+                  </label>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handlePinUpdate}
+                  className="w-full px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                >
+                  {formData.adminPin ? 'Ubah PIN Admin' : 'Buat PIN Admin'}
+                </button>
+
+                {pinMessage && (
+                  <div className={`rounded-xl border px-3 py-2 text-[11px] font-medium ${
+                    pinMessage.type === 'success'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                      : 'bg-rose-50 border-rose-200 text-rose-700'
+                  }`}>
+                    {pinMessage.text}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="text-[11px] text-rose-700 bg-rose-50 border border-rose-100 rounded-xl p-3 flex-1">
+                  <p className="font-bold mb-1">⚠️ Perhatian:</p>
+                  <ul className="list-disc list-inside space-y-0.5 text-rose-600">
+                    <li>PIN disimpan di localStorage browser.</li>
+                    <li>Catat PIN di tempat aman.</li>
+                    <li>Jika lupa PIN lama, aktifkan opsi reset untuk membuat PIN baru.</li>
+                  </ul>
+                </div>
+
+                {formData.adminPin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({ ...formData, adminPin: '' });
+                      setPinForm({ currentPin: '', newPin: '', confirmPin: '', resetConfirmed: false });
+                      setPinMessage({ type: 'success', text: 'PIN admin berhasil dinonaktifkan.' });
+                      storageService.saveSettings({ ...formData, adminPin: '' }, currentUser);
+                      storageService.addAuditLog({
+                        action: 'DISABLE_ADMIN_PIN',
+                        module: 'system',
+                        category: 'security',
+                        details: 'Menonaktifkan PIN keamanan admin',
+                        user: currentUser
+                      });
+                      onRefreshData();
+                    }}
+                    className="text-[11px] font-bold text-rose-500 hover:text-rose-700 underline text-left cursor-pointer"
+                  >
+                    🗑 Nonaktifkan PIN
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* System & Audio */}
         <div className="space-y-4 pt-4 border-t border-slate-100">
           <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
             <Shield className="w-4 h-4 text-blue-600" />
-            <span>Preferensi & Database</span>
+            <span>Preferensi &amp; Database</span>
           </h2>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200">

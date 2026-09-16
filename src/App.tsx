@@ -54,6 +54,7 @@ import { OverviewTab } from './components/Dashboard/OverviewTab';
 import { PublicDashboardView } from './components/Dashboard/PublicDashboardView';
 import { ProductCatalogTab } from './components/Products/ProductCatalogTab';
 import { ProductFormModal } from './components/Products/ProductFormModal';
+import { DeletePinModal } from './components/Products/DeletePinModal';
 import { SalesOrdersTab } from './components/Sales/SalesOrdersTab';
 import { GoodsReceiptTab } from './components/Purchasing/GoodsReceiptTab';
 import { DemoCenterTab } from './components/DemoUnits/DemoCenterTab';
@@ -100,12 +101,47 @@ export default function App() {
 
   // Modals & Drawers
   const [selectedDetailItem, setSelectedDetailItem] = useState<InventoryItem | null>(null);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isStockMovementModalOpen, setIsStockMovementModalOpen] = useState(false);
-  
+
+  const openDeletePinModal = (id: string) => {
+    setDeleteTargetId(id);
+    setIsPinModalOpen(true);
+  };
+
+  const closeDeletePinModal = () => {
+    setIsPinModalOpen(false);
+    setDeleteTargetId(null);
+  };
+
+  const confirmDeleteProduct = (pin: string) => {
+    // If PIN is set in settings, validate it; otherwise allow deletion.
+    if (settings.adminPin && pin !== settings.adminPin) {
+      showToast('PIN Salah', 'Kode keamanan tidak cocok. Penghapusan dibatalkan.', true);
+      return;
+    }
+    if (!deleteTargetId) return;
+    const success = storageService.deleteItem(deleteTargetId);
+    if (success) {
+      refreshData();
+      showToast('Produk Dihapus', 'Master produk berhasil dihapus dari sistem.');
+    }
+    closeDeletePinModal();
+  };
+
+  // Updated delete handler to open PIN modal
+  const handleDeleteProduct = (id: string) => {
+    if (!permissions.canEditProducts) {
+      showToast('Akses Ditolak', 'Anda tidak memiliki izin untuk menghapus produk.');
+      return;
+    }
+    openDeletePinModal(id);
+  };  
   // Public TV Wallboard Mode
   const [isPublicDashboardMode, setIsPublicDashboardMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -259,18 +295,7 @@ export default function App() {
     setIsProductModalOpen(false);
   };
 
-  const handleDeleteProduct = (id: string) => {
-    if (!permissions.canEditProducts) {
-      showToast('Akses Ditolak', 'Anda tidak memiliki izin untuk menghapus produk.');
-      return;
-    }
 
-    const success = storageService.deleteItem(id);
-    if (success) {
-      refreshData();
-      showToast('Produk Dihapus', 'Master produk berhasil dihapus dari sistem.');
-    }
-  };
 
   const handleQuickAdjustStock = (id: string, delta: number) => {
     if (!permissions.canEditProducts) {
@@ -946,6 +971,15 @@ export default function App() {
           settings={settings}
         />
       )}
+
+      {/* Delete PIN Confirmation Modal */}
+      <DeletePinModal
+        isOpen={isPinModalOpen}
+        productName={items.find(i => i.id === deleteTargetId)?.name}
+        hasPinSet={!!settings.adminPin}
+        onConfirm={confirmDeleteProduct}
+        onCancel={closeDeletePinModal}
+      />
 
       {/* Mobile Drawer Menu */}
       {isMobileMenuOpen && (
