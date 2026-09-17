@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getInventoryStockState, getProductStockSummary } from '../src/utils/inventoryStock';
+import { canSelectForDemo, getInventoryStockState, getProductStockSummary } from '../src/utils/inventoryStock';
 
 test('a demo checkout reduces ready stock by one unit', () => {
   const state = getInventoryStockState({
@@ -39,6 +39,28 @@ test('checkout quantity of two reduces a 15-unit product to 13 ready', () => {
   const state = getProductStockSummary([item], item);
   assert.equal(state.demoQuantity, 2);
   assert.equal(state.readyQuantity, 13);
+});
+
+test('partially loaned demo stock remains selectable until quantity is exhausted', () => {
+  const item = {
+    quantity: 3,
+    status: 'on_demo',
+    demoLoanInfo: { active: true, quantity: 2 }
+  } as any;
+
+  assert.equal(getInventoryStockState(item).readyQuantity, 1);
+  assert.equal(canSelectForDemo(item), true);
+});
+
+test('fully loaned out product is no longer selectable', () => {
+  const item = {
+    quantity: 2,
+    status: 'demo_loaned',
+    demoLoanInfo: { active: true, quantity: 2 }
+  } as any;
+
+  assert.equal(getInventoryStockState(item).readyQuantity, 0);
+  assert.equal(canSelectForDemo(item), false);
 });
 
 test('catalog status changes only when stock is empty', () => {

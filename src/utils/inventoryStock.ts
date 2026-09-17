@@ -39,6 +39,15 @@ export const getInventoryStockState = (item: Pick<InventoryItem, 'quantity' | 's
 };
 
 /** Returns the ready/demo balance for a SKU without double-counting demo rows. */
+export const canSelectForDemo = (item: Pick<InventoryItem, 'quantity' | 'status' | 'demoLoanInfo'>): boolean => {
+  if (!item || item.quantity <= 0) return false;
+
+  const blockedStatuses = ['service', 'rusak', 'hilang', 'maintenance', 'broken', 'repair'];
+  if (blockedStatuses.includes(item.status)) return false;
+
+  return getInventoryStockState(item).readyQuantity > 0;
+};
+
 export const getProductStockSummary = (items: InventoryItem[], item: InventoryItem): ProductStockSummary => {
   const skuItems = items.filter(candidate => candidate.sku === item.sku);
   const relatedItems = skuItems.length > 0 ? skuItems : [item];

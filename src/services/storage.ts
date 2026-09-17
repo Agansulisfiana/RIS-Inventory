@@ -1770,6 +1770,46 @@ class StorageService {
     this.getSettings();
   }
 
+  clearAllData(): void {
+    const keysToClear = [
+      STORAGE_KEYS.INVENTORY,
+      STORAGE_KEYS.TRANSACTIONS,
+      STORAGE_KEYS.SALES_ORDERS,
+      STORAGE_KEYS.GOODS_RECEIPTS,
+      STORAGE_KEYS.SERVICE_TICKETS,
+      STORAGE_KEYS.STOCK_OPNAME,
+      STORAGE_KEYS.AUDIT_LOGS,
+      STORAGE_KEYS.NOTIFICATIONS,
+      STORAGE_KEYS.BACKUPS
+    ];
+
+    keysToClear.forEach((key) => localStorage.removeItem(key));
+
+    const emptySettings: WarehouseSettings = {
+      ...INITIAL_SETTINGS,
+      companyName: '',
+      warehouseName: '',
+      address: '',
+      phone: '',
+      picName: '',
+      warehouses: [],
+      categories: [],
+      rackLocations: [],
+      lastBackupDate: undefined,
+      adminPin: undefined
+    };
+
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(emptySettings));
+    localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.SALES_ORDERS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.GOODS_RECEIPTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.SERVICE_TICKETS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.STOCK_OPNAME, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
+  }
+
   getItemByBarcodeOrSku(code: string): InventoryItem | undefined {
     const clean = code.trim().toLowerCase();
     return this.getItems().find(i => 

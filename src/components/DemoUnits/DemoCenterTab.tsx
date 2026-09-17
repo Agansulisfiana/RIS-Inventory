@@ -21,7 +21,7 @@ import { InventoryItem, User, WarehouseSettings } from '../../types';
 import { exportService } from '../../services/exportService';
 import { RisLogo } from '../Common/RisLogo';
 import { formatCurrency } from '../../utils/currency';
-import { getInventoryStockState } from '../../utils/inventoryStock';
+import { canSelectForDemo, getInventoryStockState } from '../../utils/inventoryStock';
 
 interface DemoCenterTabProps {
   items: InventoryItem[];
@@ -90,10 +90,12 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
   // remain visible with their status, but cannot be selected for a new loan.
   const demoProductOptions = items.map(item => {
     const stock = getInventoryStockState(item);
+    const isReady = canSelectForDemo(item) && stock.readyQuantity > 0;
+
     return {
       item,
       stock,
-      isReady: stock.catalogStatus === 'tersedia' && !stock.isDemo && stock.readyQuantity > 0
+      isReady
     };
   });
   const availableProductsForDemo = demoProductOptions.filter(option => option.isReady);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Package, 
@@ -9,7 +9,8 @@ import {
   Tag, 
   Sparkles, 
   Check,
-  AlertCircle
+  AlertCircle,
+  ImageUp
 } from 'lucide-react';
 import { InventoryItem, User, WarehouseSettings } from '../../types';
 
@@ -75,6 +76,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [condition, setCondition] = useState<InventoryItem['condition']>('baru');
   const [notes, setNotes] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (itemToEdit) {
@@ -114,7 +116,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setNotes('');
       setImageUrl('https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=500&auto=format&fit=crop&q=80');
     }
-  }, [itemToEdit, isOpen]);
+  }, [itemToEdit, isOpen, defaultCategory, defaultLocation]);
 
   if (!isOpen) return null;
 
@@ -124,6 +126,27 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setSku(`${prefix}-${code.toString().slice(-5)}`);
     setBarcode(`899${code}`);
     setSerialNumber(`SN-${code.toString().slice(-6)}`);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('File yang dipilih harus berupa gambar produk.');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      if (result) {
+        setImageUrl(result);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -431,14 +454,44 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           <div className="pt-2 border-t border-slate-100">
             <div className="grid grid-cols-1 gap-4">
               <div>
-                <label className="block text-slate-700 font-bold mb-1">URL Foto Produk</label>
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <label className="block text-slate-700 font-bold">Foto Produk</label>
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                  >
+                    <ImageUp className="w-3.5 h-3.5" />
+                    Upload dari Laptop
+                  </button>
+                </div>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
                 <input
                   type="text"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://..."
+                  placeholder="https://... atau upload gambar dari laptop"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
+                <div className="mt-2 flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 p-2">
+                  {imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt="Preview produk"
+                      className="h-28 object-cover rounded-lg w-full"
+                    />
+                  ) : (
+                    <div className="h-28 flex w-full items-center justify-center rounded-lg bg-slate-100 text-[10px] font-semibold text-slate-400">
+                      Preview foto produk
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

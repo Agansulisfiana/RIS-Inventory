@@ -32,6 +32,8 @@ Aplikasi ini sekarang berfungsi sebagai sistem manajemen gudang yang mencakup:
 - Menambah, mengedit, dan melihat daftar produk
 - Informasi item seperti SKU, serial number, brand, lokasi, dan stok per warehouse
 - Detail item per unit lengkap dengan histori / status stok
+- Upload foto produk langsung dari laptop atau local device ke dalam form produk
+- Mendukung preview gambar produk saat input/edit data
 
 ### 3. Sales Orders & Goods Receipt
 - Modul sales order untuk transaksi keluar barang
@@ -63,6 +65,63 @@ Aplikasi ini sekarang berfungsi sebagai sistem manajemen gudang yang mencakup:
 - Login berdasarkan user
 - Role-based access control untuk mengatur izin fitur
 - Fitur sensitif dibatasi sesuai role user
+
+### 9. Backup & Restore Data
+- Backup database manual dalam format JSON
+- Restore data dari file backup JSON langsung di aplikasi
+- Data backup bisa digunakan untuk memulihkan data jika terjadi kehilangan atau migrasi data
+
+### 10. Reset Data Kosong / Real Data Setup
+- Fitur reset “Hapus Semua Data” di bagian pengaturan
+- Berguna untuk membersihkan database demo/sample agar aplikasi siap dipakai dengan data asli dari perusahaan
+- Setelah reset, aplikasi berada dalam kondisi kosong dan siap dibuat data real dari awal
+
+## Fitur terbaru yang ditambahkan
+
+### Upload gambar produk lokal
+Pada form tambah atau edit produk, pengguna dapat memilih gambar langsung dari file explorer laptop tanpa harus menyalin URL dari internet. File gambar akan diproses dan ditampilkan sebagai preview sebelum data disimpan.
+
+### Restore backup JSON di aplikasi
+Di menu pengaturan, terdapat tombol restore backup JSON. Pengguna cukup memilih file backup yang telah diunduh sebelumnya, lalu aplikasi akan memuat data dari file JSON ke localStorage aplikasi.
+
+### Reset semua data aplikasi
+Untuk kebutuhan memulai dari awal dengan data real, tersedia fitur pembersihan seluruh data di zona berbahaya di pengaturan. Fitur ini menghapus data inventaris, transaksi, log, backup, dan notifikasi sehingga sistem benar-benar kosong.
+
+## Panduan operasional
+
+### Menambah produk baru dengan foto
+1. Buka menu produk atau inventory
+2. Klik tombol tambah produk baru
+3. Isi form produk
+4. Klik tombol “Upload dari Laptop”
+5. Pilih file gambar dari komputer
+6. Simpan produk
+
+### Backup database
+1. Buka menu Pengaturan
+2. Pilih area Backup Database Manual
+3. Klik tombol “Download Backup”
+4. File JSON akan terunduh ke perangkat
+
+### Restore database
+1. Buka menu Pengaturan
+2. Pilih area Restore Backup JSON
+3. Klik tombol “Restore Backup”
+4. Pilih file JSON backup yang sebelumnya disimpan
+5. Data akan dipulihkan ke aplikasi
+
+### Reset aplikasi agar mulai dari nol
+1. Buka menu Pengaturan
+2. Scroll ke bagian “Zona Berbahaya”
+3. Klik tombol “Hapus Semua Data”
+4. Konfirmasi konfirmasi warning
+5. Data aplikasi akan dibersihkan dan siap dibuat ulang dari awal
+
+## Catatan penting
+
+- Data aplikasi disimpan di browser menggunakan localStorage.
+- Untuk penggunaan nyata, disarankan melakukan backup secara berkala untuk mencegah kehilangan data.
+- Fitur reset bersifat destruktif, jadi harus dilakukan dengan kehati-hatian dan konfirmasi.
 
 ## Teknologi utama
 

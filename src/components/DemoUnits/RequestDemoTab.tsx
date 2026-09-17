@@ -12,6 +12,7 @@ import {
   AlertCircle 
 } from 'lucide-react';
 import { InventoryItem, User, WarehouseSettings } from '../../types';
+import { canSelectForDemo } from '../../utils/inventoryStock';
 
 interface RequestDemoTabProps {
   items: InventoryItem[];
@@ -36,24 +37,43 @@ export const RequestDemoTab: React.FC<RequestDemoTabProps> = ({
   const [notes, setNotes] = useState('Untuk demo produk di kantor cabang klien selama 14 hari');
   
   // Selected Units list
-  const [selectedUnits, setSelectedUnits] = useState<Array<{ id: string; sn: string; product: string; condition: string }>>([
-    { id: 'item-001', sn: 'SN001235', product: 'IDP Smart-81', condition: 'Baik' },
-    { id: 'item-003', sn: 'SN000950', product: 'Fargo HDP5600', condition: 'Baik' }
+  type SelectedUnit = {
+    id: string;
+    sn: string;
+    product: string;
+    condition: string;
+    quantity: number;
+    serialNumbers: string[];
+  };
+
+  const [selectedUnits, setSelectedUnits] = useState<SelectedUnit[]>([
+    { id: 'item-001', sn: 'SN001235', product: 'IDP Smart-81', condition: 'Baik', quantity: 1, serialNumbers: ['SN001235'] },
+    { id: 'item-003', sn: 'SN000950', product: 'Fargo HDP5600', condition: 'Baik', quantity: 1, serialNumbers: ['SN000950'] }
   ]);
 
   const [showUnitSelector, setShowUnitSelector] = useState(false);
 
-  const availableUnits = items.filter(i => 
-    i.status === 'tersedia' || i.status === 'in_warehouse'
-  );
+  const buildSerialEntries = (unit: SelectedUnit) => {
+    const targetQty = Math.max(1, unit.quantity || unit.serialNumbers?.length || 1);
+    return Array.from({ length: targetQty }, (_, index) => {
+      const value = unit.serialNumbers?.[index];
+      if (value && value.trim()) return value;
+      return unit.sn || `SN-${Date.now().toString().slice(-6)}-${index + 1}`;
+    });
+  };
+
+  const availableUnits = items.filter(canSelectForDemo);
 
   const handleAddUnit = (item: InventoryItem) => {
     if (selectedUnits.some(u => u.id === item.id)) return;
+    const defaultSn = item.serialNumber || `SN-${Date.now().toString().slice(-6)}`;
     setSelectedUnits([...selectedUnits, {
       id: item.id,
-      sn: item.serialNumber,
+      sn: defaultSn,
       product: item.name,
-      condition: item.condition === 'baru' || item.condition === 'bagus' ? 'Baik' : 'Perlu Servis'
+      condition: item.condition === 'baru' || item.condition === 'bagus' ? 'Baik' : 'Perlu Servis',
+      quantity: 1,
+      serialNumbers: [defaultSn]
     }]);
     setShowUnitSelector(false);
   };
@@ -62,12 +82,55 @@ export const RequestDemoTab: React.FC<RequestDemoTabProps> = ({
     setSelectedUnits(selectedUnits.filter(u => u.id !== id));
   };
 
+  const updateSelectedUnitQuantities = (id: string, quantity: number) => {
+    const safeQty = Math.max(1, Number(quantity) || 1);
+    setSelectedUnits(prev => prev.map(unit => {
+      if (unit.id !== id) return unit;
+      const nextSerials = Array.from({ length: safeQty }, (_, index) => {
+        const existing = unit.serialNumbers?.[index];
+        if (existing && existing.trim()) return existing;
+        return unit.sn || `SN-${Date.now().toString().slice(-6)}-${index + 1}`;
+      });
+      return {
+        ...unit,
+        quantity: safeQty,
+        serialNumbers: nextSerials,
+        sn: nextSerials[0] || unit.sn
+      };
+    }));
+  };
+
+  const updateSelectedUnitSerial = (id: string, index: number, value: string) => {
+    setSelectedUnits(prev => prev.map(unit => {
+      if (unit.id !== id) return unit;
+      const nextSerials = [...(unit.serialNumbers || [unit.sn])];
+      nextSerials[index] = value;
+      const primary = nextSerials[0] || unit.sn;
+      return {
+        ...unit,
+        serialNumbers: nextSerials,
+        sn: primary
+      };
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedUnits.length === 0) {
       alert('Pilih minimal 1 unit untuk demo.');
       return;
     }
+
+    const invalidSerial = selectedUnits.find(unit => {
+      const serials = unit.serialNumbers && unit.serialNumbers.length > 0 ? unit.serialNumbers : [unit.sn];
+      return serials.some(serial => !serial.trim());
+    });
+
+    if (invalidSerial) {
+      alert('Serial Number untuk setiap unit harus diisi, terutama saat qty lebih dari 1.');
+      return;
+    }
+
     onSubmitRequest({
       customer,
       purpose,
@@ -217,6 +280,7 @@ export const RequestDemoTab: React.FC<RequestDemoTabProps> = ({
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100 text-slate-500 font-bold border-b border-slate-200 uppercase text-[10px]">
                 <tr>
+                  <th className="py-2.5 px-3.5">Qty</th>
                   <th className="py-2.5 px-3.5">Serial Number</th>
                   <th className="py-2.5 px-3.5">Produk</th>
                   <th className="py-2.5 px-3.5">Kondisi</th>
@@ -226,8 +290,30 @@ export const RequestDemoTab: React.FC<RequestDemoTabProps> = ({
               <tbody className="divide-y divide-slate-200 font-medium text-slate-700">
                 {selectedUnits.length > 0 ? (
                   selectedUnits.map((u) => (
-                    <tr key={u.id} className="bg-white">
-                      <td className="py-2.5 px-3.5 font-mono font-bold text-blue-600">{u.sn}</td>
+                    <tr key={u.id} className="bg-white align-top">
+                      <td className="py-2.5 px-3.5">
+                        <input
+                          type="number"
+                          min={1}
+                          value={u.quantity}
+                          onChange={(e) => updateSelectedUnitQuantities(u.id, Number(e.target.value))}
+                          className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </td>
+                      <td className="py-2.5 px-3.5">
+                        <div className="space-y-1.5 min-w-[150px]">
+                          {buildSerialEntries(u).map((serial, index) => (
+                            <input
+                              key={`${u.id}-${index}`}
+                              type="text"
+                              value={serial}
+                              onChange={(e) => updateSelectedUnitSerial(u.id, index, e.target.value)}
+                              placeholder={index === 0 ? 'SN unit 1' : `SN unit ${index + 1}`}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[10px] font-mono font-bold text-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            />
+                          ))}
+                        </div>
+                      </td>
                       <td className="py-2.5 px-3.5 text-slate-900 font-semibold">{u.product}</td>
                       <td className="py-2.5 px-3.5">
                         <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[10px] font-bold border border-emerald-200">
@@ -247,7 +333,7 @@ export const RequestDemoTab: React.FC<RequestDemoTabProps> = ({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-slate-400 text-xs">
+                    <td colSpan={5} className="py-6 text-center text-slate-400 text-xs">
                       Belum ada unit yang dipilih. Klik tombol "+ Pilih Unit" di atas.
                     </td>
                   </tr>

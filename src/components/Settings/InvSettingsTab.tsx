@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   Building2, 
   MapPin, 
@@ -89,6 +89,9 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
     resetConfirmed: false
   });
   const [pinMessage, setPinMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [restoreMessage, setRestoreMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [clearMessage, setClearMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const restoreInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,7 +149,7 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
     storageService.addAuditLog({
       action: 'UPDATE_ADMIN_PIN',
       module: 'system',
-      category: 'security',
+      category: 'system',
       details: currentPin ? 'Mengubah PIN keamanan admin' : 'Membuat PIN keamanan admin',
       user: currentUser
     });
@@ -168,6 +171,80 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
     a.download = `INVTRACK_Backup_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleRestore = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      setRestoreMessage({ type: 'error', text: 'File restore harus berformat JSON backup.' });
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const ok = storageService.importBackupJSON(text, currentUser);
+
+      if (!ok) {
+        setRestoreMessage({ type: 'error', text: 'Format file backup tidak valid atau data tidak dapat dipulihkan.' });
+        event.target.value = '';
+        return;
+      }
+
+      storageService.addAuditLog({
+        action: 'RESTORE_BACKUP_JSON',
+        module: 'system',
+        category: 'system',
+        details: `Restore data dari file backup ${file.name}`,
+        user: currentUser
+      });
+
+      setRestoreMessage({ type: 'success', text: 'Backup berhasil dipulihkan ke aplikasi.' });
+      onRefreshData();
+    } catch {
+      setRestoreMessage({ type: 'error', text: 'Gagal membaca file backup. Coba file lain.' });
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const handleClearAllData = () => {
+    const confirmed = window.confirm(
+      'PERINGATAN: Anda akan menghapus semua data inventaris, transaksi, demo, backup, dan notifikasi. Data ini akan direset ke keadaan kosong agar dapat dibuat ulang dari awal. Lanjutkan?'
+    );
+
+    if (!confirmed) return;
+
+    storageService.clearAllData();
+    storageService.addAuditLog({
+      action: 'CLEAR_ALL_DATA',
+      module: 'system',
+      category: 'system',
+      details: 'Menghapus semua data aplikasi untuk memulai dari nol',
+      user: currentUser
+    });
+
+    setClearMessage({
+      type: 'success',
+      text: 'Semua data aplikasi berhasil dihapus. Aplikasi sekarang dalam keadaan kosong dan siap dibuat data real.'
+    });
+
+    setFormData({
+      ...formData,
+      companyName: '',
+      warehouseName: '',
+      address: '',
+      phone: '',
+      picName: '',
+      warehouses: [],
+      categories: [],
+      rackLocations: [],
+      adminPin: undefined
+    });
+
+    onRefreshData();
   };
 
   return (
@@ -386,7 +463,7 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
                       storageService.addAuditLog({
                         action: 'DISABLE_ADMIN_PIN',
                         module: 'system',
-                        category: 'security',
+                        category: 'system',
                         details: 'Menonaktifkan PIN keamanan admin',
                         user: currentUser
                       });
@@ -428,19 +505,79 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
             </button>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-            <div>
-              <div className="text-xs font-bold text-blue-950">Backup Database Manual</div>
-              <div className="text-[11px] text-blue-800/70">Unduh arsip lengkap data inventaris, demo unit, dan riwayat transaksi (JSON)</div>
+          <div className="flex flex-col gap-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <div className="text-xs font-bold text-blue-950">Backup Database Manual</div>
+                <div className="text-[11px] text-blue-800/70">Unduh arsip lengkap data inventaris, demo unit, dan riwayat transaksi (JSON)</div>
+              </div>
+              <button
+                type="button"
+                onClick={handleBackup}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Backup</span>
+              </button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2 border-t border-blue-100">
+              <div>
+                <div className="text-xs font-bold text-blue-950">Restore Backup JSON</div>
+                <div className="text-[11px] text-blue-800/70">Pilih file backup yang sudah diunduh untuk mengembalikan data aplikasi.</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={restoreInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleRestore}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => restoreInputRef.current?.click()}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Restore Backup</span>
+                </button>
+              </div>
+            </div>
+
+            {restoreMessage && (
+              <div className={`rounded-xl border px-3 py-2 text-[11px] font-medium ${
+                restoreMessage.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  : 'bg-rose-50 border-rose-200 text-rose-700'
+              }`}>
+                {restoreMessage.text}
+              </div>
+            )}
+          </div>
+
+          <div className="border border-rose-200 bg-rose-50 rounded-xl p-4 space-y-3">
+            <div className="text-xs font-bold text-rose-700">Zona Berbahaya</div>
+            <div className="text-[11px] text-rose-600">
+              Hapus semua data aplikasi saat ini agar bisa dibuat data real dari nol.
             </div>
             <button
               type="button"
-              onClick={handleBackup}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              onClick={handleClearAllData}
+              className="w-full px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download Backup</span>
+              <X className="w-3.5 h-3.5" />
+              <span>Hapus Semua Data</span>
             </button>
+            {clearMessage && (
+              <div className={`rounded-xl border px-3 py-2 text-[11px] font-medium ${
+                clearMessage.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  : 'bg-rose-50 border-rose-200 text-rose-700'
+              }`}>
+                {clearMessage.text}
+              </div>
+            )}
           </div>
         </div>
 
