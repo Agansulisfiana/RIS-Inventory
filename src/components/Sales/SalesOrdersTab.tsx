@@ -287,7 +287,7 @@ export const SalesOrdersTab: React.FC<SalesOrdersTabProps> = ({
             className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Buat Penjualan Baru</span>
+            <span>Buat Penjualan Baru</span>
           </button>
         </div>
       </div>
@@ -686,7 +686,7 @@ export const SalesOrdersTab: React.FC<SalesOrdersTabProps> = ({
                     onClick={handleAddItemToCart}
                     className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold cursor-pointer transition-colors"
                   >
-                    + Masukkan
+                    Masukkan
                   </button>
                 </div>
 

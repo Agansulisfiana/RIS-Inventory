@@ -66,6 +66,7 @@ import { InvReportsTab } from './components/Reports/InvReportsTab';
 import { InvSettingsTab } from './components/Settings/InvSettingsTab';
 import { UsersTab } from './components/Users/UsersTab';
 import { UnitDetailModal } from './components/Inventory/UnitDetailModal';
+import { BarcodePrintModal } from './components/Inventory/BarcodePrintModal';
 import { BarcodeScannerModal } from './components/Scanner/BarcodeScannerModal';
 import { LoginModal } from './components/Auth/LoginModal';
 import { StockMovementModal } from './components/Transactions/StockMovementModal';
@@ -106,6 +107,7 @@ export default function App() {
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<InventoryItem | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [barcodePrintItem, setBarcodePrintItem] = useState<InventoryItem | null>(null);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isStockMovementModalOpen, setIsStockMovementModalOpen] = useState(false);
 
@@ -190,6 +192,7 @@ export default function App() {
     ? items.filter(i => 
         i.name.toLowerCase().includes(globalSearch.toLowerCase()) ||
         i.serialNumber.toLowerCase().includes(globalSearch.toLowerCase()) ||
+        (Array.isArray(i.serialNumbers) && i.serialNumbers.some(s => s?.toLowerCase().includes(globalSearch.toLowerCase()))) ||
         i.sku.toLowerCase().includes(globalSearch.toLowerCase()) ||
         i.brand.toLowerCase().includes(globalSearch.toLowerCase()) ||
         i.location.toLowerCase().includes(globalSearch.toLowerCase())
@@ -297,16 +300,26 @@ export default function App() {
 
 
 
-  const handleQuickAdjustStock = (id: string, delta: number) => {
+  const handleQuickAdjustStock = (id: string, delta: number, notes?: string, warehouse?: string) => {
     if (!permissions.canEditProducts) {
       showToast('Akses Ditolak', 'Anda tidak memiliki izin untuk menyesuaikan stok.');
       return;
     }
 
-    const ok = storageService.adjustItemStock(id, delta, delta > 0 ? 'Masuk' : 'Keluar', `Restock manual (+${delta})`, currentUser || undefined);
+    const ok = storageService.adjustItemStock(
+      id, 
+      delta, 
+      delta > 0 ? 'Masuk' : 'Keluar', 
+      notes || `Restock manual (${delta > 0 ? `+${delta}` : delta})`, 
+      currentUser || undefined,
+      warehouse
+    );
     if (ok) {
       refreshData();
-      showToast('Stok Berhasil Disesuaikan', `Stok barang berhasil ditambah +${delta} unit.`);
+      showToast(
+        'Stok Berhasil Disesuaikan', 
+        `Stok barang berhasil ${delta > 0 ? `ditambah +${delta}` : `dikurangi ${Math.abs(delta)}`} unit.`
+      );
     }
   };
 
@@ -362,7 +375,7 @@ export default function App() {
         pic: info.borrowerName,
         demoLoanInfo: info,
         lastUpdated: new Date().toISOString(),
-        updatedBy: currentUser?.name || 'Sales'
+        updatedBy: info.handedOverBy || currentUser?.name || 'Sales'
       };
 
       storageService.saveItem(updatedItem, currentUser || undefined);
@@ -373,14 +386,14 @@ export default function App() {
         type: 'Demo Out',
         itemId: it.id,
         itemSku: it.sku,
-        serialNumber: it.serialNumber,
+        serialNumber: info.serialNumber || it.serialNumber,
         itemName: it.name,
         fromLocation: it.location,
         toLocation: `Customer: ${info.customerName}`,
         quantity: info.quantity || 1,
         pic: info.borrowerName,
         status: 'On Demo',
-        notes: `Peminjaman demo: ${info.purpose}`,
+        notes: `Peminjaman demo: ${info.purpose}${info.handedOverBy ? ` (Diserahkan oleh: ${info.handedOverBy})` : ''}`,
         customer: info.customerName
       });
 
@@ -784,7 +797,7 @@ export default function App() {
                 onEditProduct={handleEditProduct}
                 onDeleteProduct={handleDeleteProduct}
                 onQuickAdjustStock={handleQuickAdjustStock}
-                onPrintBarcode={(item) => setSelectedDetailItem(item)}
+                onPrintBarcode={(item) => setBarcodePrintItem(item)}
                 onOpenSalesModal={() => setActiveTab('sales_orders')}
                 onOpenReceiptModal={() => setActiveTab('goods_receipt')}
               />
@@ -943,6 +956,12 @@ export default function App() {
             handleEditProduct(item);
             setSelectedDetailItem(null);
           }}
+          onRefreshData={() => {
+            refreshData();
+            // sync selectedDetailItem with latest from storage
+            const freshItem = storageService.getItems().find(i => i.id === selectedDetailItem.id);
+            if (freshItem) setSelectedDetailItem(freshItem);
+          }}
         />
       )}
 
@@ -968,6 +987,16 @@ export default function App() {
           onSave={handleSaveStockMovement}
           items={items}
           currentUser={currentUser}
+          settings={settings}
+        />
+      )}
+
+      {/* Modal Cetak Stiker Barcode Satuan */}
+      {barcodePrintItem && (
+        <BarcodePrintModal
+          item={barcodePrintItem}
+          isOpen={Boolean(barcodePrintItem)}
+          onClose={() => setBarcodePrintItem(null)}
           settings={settings}
         />
       )}

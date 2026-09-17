@@ -12,7 +12,8 @@ import {
   BackupSnapshot,
   StockLocationStatus,
   ItemCondition,
-  DemoLoanInfo
+  DemoLoanInfo,
+  StockMovementType
 } from '../types';
 import { warehouseAudio } from '../utils/audio';
 import { getPermissions } from '../utils/permissions';
@@ -30,6 +31,7 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: 'invtrack_notifications_v3',
   SETTINGS: 'invtrack_settings_v3',
   BACKUPS: 'invtrack_backups_v3',
+  DATA_CLEARED: 'invtrack_data_cleared_v3',
 };
 
 // Initial Seed Users
@@ -1063,6 +1065,10 @@ class StorageService {
   getItems(): InventoryItem[] {
     const raw = localStorage.getItem(STORAGE_KEYS.INVENTORY);
     if (!raw) {
+      if (localStorage.getItem(STORAGE_KEYS.DATA_CLEARED) === 'true') {
+        localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify([]));
+        return [];
+      }
       localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify(INITIAL_INVENTORY));
       return INITIAL_INVENTORY;
     }
@@ -1160,7 +1166,7 @@ class StorageService {
       ...item,
       id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       warehouseStocks,
-      quantity: Object.values(warehouseStocks).reduce((s: number, v: any) => s + (Number(v) || 0), 0),
+      quantity: (Object.values(warehouseStocks) as any[]).reduce<number>((s: number, v: any) => s + (Number(v) || 0), 0),
       lastUpdated: new Date().toISOString(),
       updatedBy: user?.name || 'Admin'
     };
@@ -1226,7 +1232,7 @@ class StorageService {
     return false;
   }
 
-  adjustItemStock(id: string, delta: number, type: 'Penjualan' | 'Pembelian' | 'Masuk' | 'Keluar' | 'Opname Adjustment', reason: string, user?: User, warehouse?: string): boolean {
+  adjustItemStock(id: string, delta: number, type: StockMovementType | 'Penjualan' | 'Pembelian' | 'Masuk' | 'Keluar' | 'Opname Adjustment', reason: string, user?: User, warehouse?: string): boolean {
     try { this.ensurePermission(user, 'canEditProducts'); } catch (e) { throw e; }
     const items = this.getItems();
     const idx = items.findIndex(i => i.id === id);
@@ -1287,6 +1293,10 @@ class StorageService {
   getTransactions(): StockTransaction[] {
     const raw = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
     if (!raw) {
+      if (localStorage.getItem(STORAGE_KEYS.DATA_CLEARED) === 'true') {
+        localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+        return [];
+      }
       localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(INITIAL_TRANSACTIONS));
       return INITIAL_TRANSACTIONS;
     }
@@ -1316,6 +1326,10 @@ class StorageService {
   getSalesOrders(): SalesOrder[] {
     const raw = localStorage.getItem(STORAGE_KEYS.SALES_ORDERS);
     if (!raw) {
+      if (localStorage.getItem(STORAGE_KEYS.DATA_CLEARED) === 'true') {
+        localStorage.setItem(STORAGE_KEYS.SALES_ORDERS, JSON.stringify([]));
+        return [];
+      }
       localStorage.setItem(STORAGE_KEYS.SALES_ORDERS, JSON.stringify(INITIAL_SALES_ORDERS));
       return INITIAL_SALES_ORDERS;
     }
@@ -1418,6 +1432,10 @@ class StorageService {
   getGoodsReceipts(): GoodsReceipt[] {
     const raw = localStorage.getItem(STORAGE_KEYS.GOODS_RECEIPTS);
     if (!raw) {
+      if (localStorage.getItem(STORAGE_KEYS.DATA_CLEARED) === 'true') {
+        localStorage.setItem(STORAGE_KEYS.GOODS_RECEIPTS, JSON.stringify([]));
+        return [];
+      }
       localStorage.setItem(STORAGE_KEYS.GOODS_RECEIPTS, JSON.stringify(INITIAL_GOODS_RECEIPTS));
       return INITIAL_GOODS_RECEIPTS;
     }
@@ -1503,6 +1521,10 @@ class StorageService {
   getServiceTickets(): ServiceTicket[] {
     const raw = localStorage.getItem(STORAGE_KEYS.SERVICE_TICKETS);
     if (!raw) {
+      if (localStorage.getItem(STORAGE_KEYS.DATA_CLEARED) === 'true') {
+        localStorage.setItem(STORAGE_KEYS.SERVICE_TICKETS, JSON.stringify([]));
+        return [];
+      }
       localStorage.setItem(STORAGE_KEYS.SERVICE_TICKETS, JSON.stringify(INITIAL_SERVICE_TICKETS));
       return INITIAL_SERVICE_TICKETS;
     }
@@ -1566,6 +1588,10 @@ class StorageService {
   getStockOpnames(): StockOpnameSession[] {
     const raw = localStorage.getItem(STORAGE_KEYS.STOCK_OPNAME);
     if (!raw) {
+      if (localStorage.getItem(STORAGE_KEYS.DATA_CLEARED) === 'true') {
+        localStorage.setItem(STORAGE_KEYS.STOCK_OPNAME, JSON.stringify([]));
+        return [];
+      }
       localStorage.setItem(STORAGE_KEYS.STOCK_OPNAME, JSON.stringify(INITIAL_STOCK_OPNAME));
       return INITIAL_STOCK_OPNAME;
     }
@@ -1754,6 +1780,7 @@ class StorageService {
 
   resetToDefaultData(): void {
     // destructive: caller must ensure permission before calling
+    localStorage.removeItem(STORAGE_KEYS.DATA_CLEARED);
     localStorage.removeItem(STORAGE_KEYS.INVENTORY);
     localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
     localStorage.removeItem(STORAGE_KEYS.SALES_ORDERS);
@@ -1770,7 +1797,7 @@ class StorageService {
     this.getSettings();
   }
 
-  clearAllData(): void {
+  clearAllData(keepMasterStructure: boolean = true): void {
     const keysToClear = [
       STORAGE_KEYS.INVENTORY,
       STORAGE_KEYS.TRANSACTIONS,
@@ -1785,21 +1812,31 @@ class StorageService {
 
     keysToClear.forEach((key) => localStorage.removeItem(key));
 
-    const emptySettings: WarehouseSettings = {
-      ...INITIAL_SETTINGS,
-      companyName: '',
-      warehouseName: '',
-      address: '',
-      phone: '',
-      picName: '',
-      warehouses: [],
-      categories: [],
-      rackLocations: [],
-      lastBackupDate: undefined,
-      adminPin: undefined
-    };
+    const currentSettings = this.getSettings();
+    const newSettings: WarehouseSettings = keepMasterStructure
+      ? {
+          ...currentSettings,
+          warehouses: currentSettings.warehouses?.length ? currentSettings.warehouses : INITIAL_SETTINGS.warehouses,
+          categories: currentSettings.categories?.length ? currentSettings.categories : INITIAL_SETTINGS.categories,
+          rackLocations: currentSettings.rackLocations?.length ? currentSettings.rackLocations : INITIAL_SETTINGS.rackLocations,
+          lastBackupDate: undefined
+        }
+      : {
+          ...INITIAL_SETTINGS,
+          companyName: '',
+          warehouseName: '',
+          address: '',
+          phone: '',
+          picName: '',
+          warehouses: [],
+          categories: [],
+          rackLocations: [],
+          lastBackupDate: undefined,
+          adminPin: undefined
+        };
 
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(emptySettings));
+    localStorage.setItem(STORAGE_KEYS.DATA_CLEARED, 'true');
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(newSettings));
     localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.SALES_ORDERS, JSON.stringify([]));
@@ -1808,12 +1845,14 @@ class StorageService {
     localStorage.setItem(STORAGE_KEYS.STOCK_OPNAME, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.BACKUPS, JSON.stringify([]));
   }
 
   getItemByBarcodeOrSku(code: string): InventoryItem | undefined {
     const clean = code.trim().toLowerCase();
     return this.getItems().find(i => 
       i.serialNumber?.toLowerCase() === clean || 
+      (Array.isArray(i.serialNumbers) && i.serialNumbers.some(s => s?.toLowerCase() === clean)) ||
       i.barcode?.toLowerCase() === clean || 
       i.sku?.toLowerCase() === clean ||
       i.id.toLowerCase() === clean

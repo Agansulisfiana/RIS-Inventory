@@ -88,7 +88,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
             className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
           >
             <ArrowDownRight className="w-4 h-4" />
-            Scan Masuk (+)
+            Scan Barang Masuk
           </button>
 
           <button
@@ -97,7 +97,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
             className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
           >
             <ArrowUpRight className="w-4 h-4" />
-            Scan Keluar (-)
+            Scan Barang Keluar
           </button>
 
           <button

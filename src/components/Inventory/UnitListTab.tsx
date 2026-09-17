@@ -47,12 +47,15 @@ export const UnitListTab: React.FC<UnitListTabProps> = ({
 
   // Filter logic
   const filtered = items.filter(item => {
+    const q = searchQuery.toLowerCase();
     const matchSearch = 
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.serialNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.pic && item.pic.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      item.location.toLowerCase().includes(searchQuery.toLowerCase());
+      item.name.toLowerCase().includes(q) ||
+      item.sku.toLowerCase().includes(q) ||
+      (item.serialNumber && item.serialNumber.toLowerCase().includes(q)) ||
+      (Array.isArray(item.serialNumbers) && item.serialNumbers.some(sn => sn.toLowerCase().includes(q))) ||
+      (item.batchNumber && item.batchNumber.toLowerCase().includes(q)) ||
+      (item.pic && item.pic.toLowerCase().includes(q)) ||
+      item.location.toLowerCase().includes(q);
 
     const matchCategory = selectedCategory === 'Semua Kategori' || item.category === selectedCategory;
     
@@ -195,7 +198,29 @@ export const UnitListTab: React.FC<UnitListTabProps> = ({
                     className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
                   >
                     <td className="py-3 px-4 font-mono font-bold text-blue-600 group-hover:underline">
-                      {item.serialNumber}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {item.snTrackingType === 'no_sn' ? (
+                          <span className="text-[11px] font-sans font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                            Non-SN ({item.quantity} {item.unit})
+                          </span>
+                        ) : item.snTrackingType === 'shared_batch' ? (
+                          <div className="flex items-center gap-1.5">
+                            <span>{item.batchNumber || item.serialNumber}</span>
+                            <span className="text-[10px] font-sans font-bold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">
+                              Batch ({item.quantity} {item.unit})
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <span>{item.serialNumber}</span>
+                            {item.serialNumbers && item.serialNumbers.length > 1 && (
+                              <span className="text-[10px] font-sans font-bold bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded">
+                                +{item.serialNumbers.length - 1} SN
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3 px-4">
                       <div className="font-bold text-slate-900">{item.name}</div>

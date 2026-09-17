@@ -38,14 +38,19 @@ export const getInventoryStockState = (item: Pick<InventoryItem, 'quantity' | 's
   };
 };
 
-/** Returns the ready/demo balance for a SKU without double-counting demo rows. */
+/** 
+ * Returns true if an item can be selected for demo unit checkout.
+ * Products remain selectable as long as their stock quantity is available (quantity > 0),
+ * even if they have active demo loans. They are only blocked if stock is empty (quantity <= 0)
+ * or if the unit is in repair/service/damaged.
+ */
 export const canSelectForDemo = (item: Pick<InventoryItem, 'quantity' | 'status' | 'demoLoanInfo'>): boolean => {
-  if (!item || item.quantity <= 0) return false;
+  if (!item || Number(item.quantity) <= 0) return false;
 
   const blockedStatuses = ['service', 'rusak', 'hilang', 'maintenance', 'broken', 'repair'];
   if (blockedStatuses.includes(item.status)) return false;
 
-  return getInventoryStockState(item).readyQuantity > 0;
+  return true;
 };
 
 export const getProductStockSummary = (items: InventoryItem[], item: InventoryItem): ProductStockSummary => {

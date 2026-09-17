@@ -189,7 +189,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 className="px-4 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-900/30 transition-all transform hover:-translate-y-0.5 cursor-pointer"
               >
                 <ShoppingCart className="w-4 h-4" />
-                <span>+ Buat Penjualan (DO)</span>
+                <span>Buat Penjualan (DO)</span>
               </button>
             )}
 
@@ -202,7 +202,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               className="px-4 py-3 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-blue-900/30 transition-all transform hover:-translate-y-0.5 cursor-pointer"
             >
               <Package className="w-4 h-4" />
-              <span>+ Tambah Produk Baru</span>
+              <span>Tambah Produk Baru</span>
             </button>
 
             {onOpenReceiptModal && (
@@ -215,7 +215,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/30 transition-all transform hover:-translate-y-0.5 cursor-pointer"
               >
                 <ArrowDownLeft className="w-4 h-4" />
-                <span>+ Terima Barang (PO)</span>
+                <span>Terima Barang (PO)</span>
               </button>
             )}
           </div>

@@ -20,7 +20,12 @@ import {
   Layers,
   ChevronRight,
   TrendingUp,
-  Tag
+  Tag,
+  X,
+  Minus,
+  Check,
+  Building2,
+  Boxes
 } from 'lucide-react';
 import { InventoryItem, User, WarehouseSettings } from '../../types';
 import { formatCurrency } from '../../utils/currency';
@@ -35,7 +40,7 @@ interface ProductCatalogTabProps {
   onAddNewProduct: () => void;
   onEditProduct: (item: InventoryItem) => void;
   onDeleteProduct: (id: string) => void;
-  onQuickAdjustStock: (id: string, delta: number) => void;
+  onQuickAdjustStock: (id: string, delta: number, notes?: string, warehouse?: string) => void;
   onPrintBarcode: (item: InventoryItem) => void;
   onOpenSalesModal?: () => void;
   onOpenReceiptModal?: () => void;
@@ -60,6 +65,35 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+
+  // Quick Restock Modal State
+  const [restockModalItem, setRestockModalItem] = useState<InventoryItem | null>(null);
+  const [restockQty, setRestockQty] = useState<number>(10);
+  const [restockDirection, setRestockDirection] = useState<'in' | 'out'>('in');
+  const [restockWarehouse, setRestockWarehouse] = useState<string>('');
+  const [restockNotes, setRestockNotes] = useState<string>('Restock manual via katalog');
+
+  const handleOpenRestock = (item: InventoryItem) => {
+    setRestockModalItem(item);
+    setRestockQty(10);
+    setRestockDirection('in');
+    setRestockNotes('Restock manual via katalog');
+    const defaultWh = item.warehouseName || (settings?.warehouses && settings.warehouses[0]) || settings?.warehouseName || 'Gudang Utama Jakarta';
+    setRestockWarehouse(defaultWh);
+  };
+
+  const handleCloseRestock = () => {
+    setRestockModalItem(null);
+  };
+
+  const handleConfirmRestock = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!restockModalItem) return;
+    const qty = Math.max(1, Math.floor(Number(restockQty) || 1));
+    const delta = restockDirection === 'in' ? qty : -qty;
+    onQuickAdjustStock(restockModalItem.id, delta, restockNotes, restockWarehouse);
+    setRestockModalItem(null);
+  };
 
   // Categories list
   const categories = ['Semua Kategori', ...(settings?.categories || [])];
@@ -97,16 +131,6 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
     exportService.exportInventoryToExcel(filteredItems, settings);
   };
 
-  const handleQuickRestockPrompt = (item: InventoryItem) => {
-    const qtyStr = prompt(`Masukkan jumlah stok yang ingin ditambahkan untuk "${item.name}":`, '10');
-    if (qtyStr) {
-      const qty = parseInt(qtyStr, 10);
-      if (!isNaN(qty) && qty > 0) {
-        onQuickAdjustStock(item.id, qty);
-      }
-    }
-  };
-
   return (
     <div className="space-y-6">
       
@@ -132,7 +156,7 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
               className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
             >
               <ArrowUpRight className="w-4 h-4" />
-              <span>+ Buat Penjualan (DO)</span>
+              <span>Buat Penjualan (DO)</span>
             </button>
           )}
 
@@ -142,7 +166,7 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
               className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
             >
               <ArrowDownLeft className="w-4 h-4" />
-              <span>+ Terima Barang (PO)</span>
+              <span>Terima Barang (PO)</span>
             </button>
           )}
 
@@ -151,7 +175,7 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
             className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Tambah Produk Baru</span>
+            <span>Tambah Produk Baru</span>
           </button>
 
           <button
@@ -403,7 +427,7 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <div className="flex min-w-[144px] items-center justify-end gap-1.5">
                           <button
-                            onClick={() => handleQuickRestockPrompt(item)}
+                            onClick={() => handleOpenRestock(item)}
                             className="h-8 px-2 text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer font-bold text-[11px] inline-flex shrink-0 items-center gap-1 border border-emerald-200"
                             title="Tambah Stok Cepat"
                           >
@@ -425,11 +449,7 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              if (confirm(`Yakin ingin menghapus produk "${item.name}"?`)) {
-                                onDeleteProduct(item.id);
-                              }
-                            }}
+                            onClick={() => onDeleteProduct(item.id)}
                             className="p-1.5 shrink-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             title="Hapus Produk"
                           >
@@ -527,7 +547,7 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
 
                 <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
                   <button
-                    onClick={() => handleQuickRestockPrompt(item)}
+                    onClick={() => handleOpenRestock(item)}
                     className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -554,6 +574,252 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Modal Quick Restock / Penyesuaian Stok Cepat */}
+      {restockModalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 my-4">
+            
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 rounded-xl shadow-xs ${
+                  restockDirection === 'in' ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
+                }`}>
+                  <Boxes className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black font-heading text-slate-900">
+                      PENYESUAIAN STOK CEPAT
+                    </h3>
+                    <span className={`px-2 py-0.5 font-mono text-[10px] font-bold rounded-md border ${
+                      restockDirection === 'in'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      {restockDirection === 'in' ? '+ Tambah Stok' : '- Kurang Stok'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Perbarui stok barang secara instan tanpa perlu form panjang
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCloseRestock}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleConfirmRestock} className="p-5 sm:p-6 space-y-4">
+              
+              {/* Product Info Card */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
+                {restockModalItem.imageUrl ? (
+                  <img
+                    src={restockModalItem.imageUrl}
+                    alt={restockModalItem.name}
+                    className="w-12 h-12 rounded-lg object-contain bg-white border border-slate-200 shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0 font-bold">
+                    <Package className="w-6 h-6" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-slate-900 text-sm truncate">
+                    {restockModalItem.name}
+                  </div>
+                  <div className="text-xs text-slate-500 font-mono mt-0.5">
+                    SKU: {restockModalItem.sku} • Rak: {restockModalItem.location || 'RAK-01'}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-[10px] uppercase font-bold text-slate-400">Stok Saat Ini</div>
+                  <div className="text-sm font-black text-slate-900">
+                    {getInventoryStockState(restockModalItem as any).readyQuantity} {restockModalItem.unit}
+                  </div>
+                </div>
+              </div>
+
+              {/* Direction Selector (Masuk / Keluar) */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Jenis Penyesuaian
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRestockDirection('in')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${
+                      restockDirection === 'in'
+                        ? 'bg-emerald-50 border-emerald-600 text-emerald-700 ring-1 ring-emerald-500/20'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Barang Masuk / Tambah (+)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRestockDirection('out')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${
+                      restockDirection === 'out'
+                        ? 'bg-amber-50 border-amber-600 text-amber-700 ring-1 ring-amber-500/20'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                    <span>Barang Keluar / Kurangi (-)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Quantity Stepper & Preset Buttons */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  Jumlah Satuan ({restockModalItem.unit || 'Unit'})
+                </label>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRestockQty(Math.max(1, restockQty - 1))}
+                    className="w-11 h-11 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+
+                  <input
+                    type="number"
+                    min="1"
+                    value={restockQty}
+                    onChange={(e) => setRestockQty(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="flex-1 h-11 px-3 text-center text-lg font-black text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setRestockQty(restockQty + 1)}
+                    className="w-11 h-11 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Quick Preset Pills */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                  <span className="text-[11px] font-bold text-slate-400 mr-1">Preset Cepat:</span>
+                  {[1, 5, 10, 20, 50, 100].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setRestockQty(num)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                        restockQty === num
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {num} {restockModalItem.unit}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Warehouse Destination */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700 flex items-center gap-1">
+                  <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Gudang Alokasi</span>
+                </label>
+                <select
+                  value={restockWarehouse}
+                  onChange={(e) => setRestockWarehouse(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {(settings?.warehouses || ['Gudang Utama Jakarta', 'Gudang Transit', 'Gudang Sparepart']).map((wh) => (
+                    <option key={wh} value={wh}>
+                      {wh}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Notes Input */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Catatan / Keterangan (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={restockNotes}
+                  onChange={(e) => setRestockNotes(e.target.value)}
+                  placeholder="Contoh: Restock penerimaan supplier, koreksi fisik, dsb."
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Live Calculation Preview */}
+              {(() => {
+                const currentReady = getInventoryStockState(restockModalItem as any).readyQuantity;
+                const delta = restockDirection === 'in' ? restockQty : -restockQty;
+                const finalQty = Math.max(0, currentReady + delta);
+
+                return (
+                  <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-slate-500">Stok Saat Ini: </span>
+                      <strong className="text-slate-800">{currentReady} {restockModalItem.unit}</strong>
+                      <span className="mx-1.5 text-slate-300">→</span>
+                      <span className={restockDirection === 'in' ? 'text-emerald-700 font-bold' : 'text-amber-700 font-bold'}>
+                        {restockDirection === 'in' ? `+${restockQty}` : `-${restockQty}`}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Stok Akhir: </span>
+                      <strong className="text-blue-700 font-black text-sm">
+                        {finalQty} {restockModalItem.unit}
+                      </strong>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleCloseRestock}
+                  className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold border border-slate-200 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className={`px-5 py-2.5 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer ${
+                    restockDirection === 'in'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
+                >
+                  <Check className="w-4 h-4" />
+                  <span>
+                    Simpan {restockDirection === 'in' ? `+${restockQty}` : `-${restockQty}`} Stok Sekarang
+                  </span>
+                </button>
+              </div>
+
+            </form>
+          </div>
         </div>
       )}
     </div>

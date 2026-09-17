@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   X, 
   Package, 
@@ -10,9 +10,19 @@ import {
   Sparkles, 
   Check,
   AlertCircle,
-  ImageUp
+  ImageUp,
+  Boxes,
+  ClipboardCopy,
+  Hash,
+  Copy,
+  RotateCcw,
+  CheckCircle2,
+  FileSpreadsheet,
+  Info,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
-import { InventoryItem, User, WarehouseSettings } from '../../types';
+import { InventoryItem, User, WarehouseSettings, SnTrackingType } from '../../types';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -78,6 +88,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [imageUrl, setImageUrl] = useState('');
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Serial Number Tracking Modes:
+  // 'unique_per_unit': 1 SN per unit fisik (Printer, Scanner, Mesin)
+  // 'shared_batch': 1 SN/Lot untuk seluruh unit produk (Ribbon, Kartu PVC, Consumables)
+  // 'no_sn': Tanpa Serial Number (Komoditas, Aksesoris umum)
+  const [snTrackingType, setSnTrackingType] = useState<SnTrackingType>('unique_per_unit');
+  const [serialNumbers, setSerialNumbers] = useState<string[]>([]);
+  const [batchNumber, setBatchNumber] = useState('');
+
+  // Quick Tools State
+  const [showSeqGenerator, setShowSeqGenerator] = useState(false);
+  const [seqPrefix, setSeqPrefix] = useState('SN-');
+  const [seqStart, setSeqStart] = useState<number>(1);
+  const [showBulkPasteModal, setShowBulkPasteModal] = useState(false);
+  const [bulkPasteText, setBulkPasteText] = useState('');
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
   useEffect(() => {
     if (itemToEdit) {
       setName(itemToEdit.name || '');
@@ -87,7 +113,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCategory(itemToEdit.category || defaultCategory);
       setBrand(itemToEdit.brand || '');
       setUnit(itemToEdit.unit || 'Unit');
-      setQuantity(itemToEdit.quantity || 0);
+      const qty = itemToEdit.quantity || 1;
+      setQuantity(qty);
       setMinStock(itemToEdit.minStock || 5);
       setCostPrice(itemToEdit.costPrice || itemToEdit.price || 0);
       setSellPrice(itemToEdit.sellPrice || itemToEdit.price || 0);
@@ -96,17 +123,48 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCondition(itemToEdit.condition || 'baru');
       setNotes(itemToEdit.notes || '');
       setImageUrl(itemToEdit.imageUrl || '');
+
+      // Resolve tracking type
+      let resolvedTracking: SnTrackingType = itemToEdit.snTrackingType || 'unique_per_unit';
+      if (!itemToEdit.snTrackingType) {
+        if (itemToEdit.category?.includes('Ribbon') || itemToEdit.category?.includes('Card') || itemToEdit.category?.includes('Cleaning') || itemToEdit.category?.includes('Film')) {
+          resolvedTracking = 'shared_batch';
+        } else if (itemToEdit.serialNumber === '-' || itemToEdit.serialNumber === 'NON-SN') {
+          resolvedTracking = 'no_sn';
+        } else {
+          resolvedTracking = 'unique_per_unit';
+        }
+      }
+      setSnTrackingType(resolvedTracking);
+      setBatchNumber(itemToEdit.batchNumber || itemToEdit.serialNumber || '');
+
+      // Populate serial numbers array
+      if (Array.isArray(itemToEdit.serialNumbers) && itemToEdit.serialNumbers.length > 0) {
+        const arr = [...itemToEdit.serialNumbers];
+        while (arr.length < qty) arr.push('');
+        setSerialNumbers(arr.slice(0, Math.max(qty, 1)));
+      } else if (itemToEdit.serialNumber && itemToEdit.serialNumber !== '-' && itemToEdit.serialNumber !== 'NON-SN') {
+        const arr = [itemToEdit.serialNumber];
+        while (arr.length < qty) arr.push('');
+        setSerialNumbers(arr.slice(0, Math.max(qty, 1)));
+      } else {
+        setSerialNumbers(Array(Math.max(qty, 1)).fill(''));
+      }
     } else {
       // Auto-generate fresh identifiers
       const randomNum = Math.floor(100000 + Math.random() * 900000);
+      const isConsumable = defaultCategory.includes('Ribbon') || defaultCategory.includes('Card') || defaultCategory.includes('Cleaning') || defaultCategory.includes('Film');
+      const initialQty = 10;
+
       setName('');
-      setSku(`PRD-${randomNum.toString().slice(-4)}`);
-      setSerialNumber(`SN-${Date.now().toString().slice(-6)}`);
+      const pfx = isConsumable ? (defaultCategory.includes('Ribbon') ? 'RBN' : 'CRD') : 'PRD';
+      const initialSku = `${pfx}-${randomNum.toString().slice(-4)}`;
+      setSku(initialSku);
       setBarcode(`899${randomNum}`);
       setCategory(defaultCategory);
       setBrand('');
       setUnit('Unit');
-      setQuantity(10);
+      setQuantity(initialQty);
       setMinStock(5);
       setCostPrice(0);
       setSellPrice(0);
@@ -115,17 +173,164 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setCondition('baru');
       setNotes('');
       setImageUrl('https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=500&auto=format&fit=crop&q=80');
+
+      if (isConsumable) {
+        setSnTrackingType('shared_batch');
+        const batch = `LOT-${pfx}-${new Date().getFullYear()}-${randomNum.toString().slice(-4)}`;
+        setBatchNumber(batch);
+        setSerialNumber(batch);
+        setSerialNumbers(Array(initialQty).fill(batch));
+      } else {
+        setSnTrackingType('unique_per_unit');
+        const snPrefix = `SN-${randomNum.toString().slice(-4)}-`;
+        setSeqPrefix(snPrefix);
+        setSeqStart(1);
+        const snList = Array.from({ length: initialQty }, (_, i) => `${snPrefix}${String(i + 1).padStart(3, '0')}`);
+        setSerialNumbers(snList);
+        setSerialNumber(snList[0]);
+        setBatchNumber('');
+      }
     }
   }, [itemToEdit, isOpen, defaultCategory, defaultLocation]);
 
-  if (!isOpen) return null;
+  // Synchronize quantity changes with serialNumbers array
+  const handleQuantityChange = (newVal: number) => {
+    const val = Math.max(1, newVal);
+    setQuantity(val);
+    setSerialNumbers(prev => {
+      const next = [...prev];
+      if (next.length < val) {
+        while (next.length < val) {
+          next.push('');
+        }
+      } else if (next.length > val) {
+        return next.slice(0, val);
+      }
+      return next;
+    });
+  };
+
+  // Smart Category handler
+  const handleCategoryChange = (newCat: string) => {
+    setCategory(newCat);
+    const isConsumable = newCat.includes('Ribbon') || newCat.includes('Card') || newCat.includes('Cleaning') || newCat.includes('Film');
+    if (isConsumable && snTrackingType === 'unique_per_unit') {
+      setSnTrackingType('shared_batch');
+      if (!batchNumber) {
+        const pfx = newCat.includes('Ribbon') ? 'RBN' : newCat.includes('Card') ? 'CRD' : 'LOT';
+        const batch = `LOT-${pfx}-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        setBatchNumber(batch);
+        setSerialNumber(batch);
+        setSerialNumbers(Array(quantity).fill(batch));
+      }
+    } else if (newCat.includes('Printer') && snTrackingType === 'shared_batch') {
+      setSnTrackingType('unique_per_unit');
+    }
+  };
+
+  // Check for duplicate serial numbers within list
+  const duplicateSns = useMemo(() => {
+    const duplicates = new Set<string>();
+    const seen = new Set<string>();
+    serialNumbers.forEach(sn => {
+      const trimmed = sn.trim().toLowerCase();
+      if (trimmed) {
+        if (seen.has(trimmed)) {
+          duplicates.add(trimmed);
+        } else {
+          seen.add(trimmed);
+        }
+      }
+    });
+    return duplicates;
+  }, [serialNumbers]);
+
+  const handleSnChange = (idx: number, val: string) => {
+    setSerialNumbers(prev => {
+      const next = [...prev];
+      next[idx] = val;
+      return next;
+    });
+    if (idx === 0) {
+      setSerialNumber(val);
+    }
+  };
+
+  const handleApplySequential = () => {
+    const generated: string[] = [];
+    const padLength = quantity >= 100 ? 3 : (seqStart < 10 ? 3 : 2);
+    for (let i = 0; i < quantity; i++) {
+      const num = seqStart + i;
+      generated.push(`${seqPrefix.trim()}${String(num).padStart(padLength, '0')}`);
+    }
+    setSerialNumbers(generated);
+    if (generated.length > 0) {
+      setSerialNumber(generated[0]);
+    }
+    setShowSeqGenerator(false);
+  };
+
+  const handleApplyBulkPaste = () => {
+    if (!bulkPasteText.trim()) return;
+    const lines = bulkPasteText
+      .split(/[\r\n,]+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    if (lines.length === 0) return;
+
+    if (lines.length > quantity) {
+      setQuantity(lines.length);
+      setSerialNumbers(lines);
+    } else {
+      setSerialNumbers(prev => {
+        const next = [...prev];
+        for (let i = 0; i < lines.length; i++) {
+          next[i] = lines[i];
+        }
+        return next;
+      });
+    }
+    if (lines[0]) {
+      setSerialNumber(lines[0]);
+    }
+    setBulkPasteText('');
+    setShowBulkPasteModal(false);
+  };
+
+  const handleCopySn = (sn: string, idx: number) => {
+    if (!sn) return;
+    navigator.clipboard.writeText(sn);
+    setCopiedIndex(idx);
+    setTimeout(() => setCopiedIndex(null), 1500);
+  };
 
   const handleAutoGenerateCodes = () => {
     const code = Math.floor(10000000 + Math.random() * 90000000);
-    const prefix = category.includes('Ribbon') ? 'RBN' : category.includes('Card') ? 'CRD' : 'PRD';
+    const isRibbon = category.includes('Ribbon');
+    const isCard = category.includes('Card');
+    const isPrinter = category.includes('Printer');
+    const prefix = isRibbon ? 'RBN' : isCard ? 'CRD' : isPrinter ? 'PRT' : 'PRD';
+
     setSku(`${prefix}-${code.toString().slice(-5)}`);
     setBarcode(`899${code}`);
-    setSerialNumber(`SN-${code.toString().slice(-6)}`);
+
+    if (snTrackingType === 'unique_per_unit') {
+      const snPrefix = `SN-${prefix}${code.toString().slice(-3)}-`;
+      setSeqPrefix(snPrefix);
+      setSeqStart(1);
+      const generated = Array.from({ length: quantity }, (_, i) => `${snPrefix}${String(i + 1).padStart(3, '0')}`);
+      setSerialNumbers(generated);
+      setSerialNumber(generated[0]);
+    } else if (snTrackingType === 'shared_batch') {
+      const batch = `LOT-${prefix}-${new Date().getFullYear()}-${code.toString().slice(-4)}`;
+      setBatchNumber(batch);
+      setSerialNumber(batch);
+      setSerialNumbers(Array(quantity).fill(batch));
+    } else {
+      setSerialNumber('-');
+      setSerialNumbers([]);
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,10 +361,32 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       return;
     }
 
+    let finalSerial = serialNumber.trim();
+    let finalSerialNumbers: string[] = [];
+
+    if (snTrackingType === 'unique_per_unit') {
+      finalSerialNumbers = Array.from({ length: quantity }, (_, idx) => {
+        const val = serialNumbers[idx]?.trim();
+        if (val) return val;
+        return `${sku.trim() || 'SN'}-${String(idx + 1).padStart(3, '0')}`;
+      });
+      finalSerial = finalSerialNumbers[0] || `SN-${Date.now().toString().slice(-6)}`;
+    } else if (snTrackingType === 'shared_batch') {
+      const batch = batchNumber.trim() || serialNumber.trim() || `LOT-${Date.now().toString().slice(-6)}`;
+      finalSerial = batch;
+      finalSerialNumbers = Array(quantity).fill(batch);
+    } else {
+      finalSerial = '-';
+      finalSerialNumbers = [];
+    }
+
     const payload = {
       name: name.trim(),
       sku: sku.trim() || `SKU-${Date.now().toString().slice(-5)}`,
-      serialNumber: serialNumber.trim() || `SN-${Date.now().toString().slice(-5)}`,
+      serialNumber: finalSerial,
+      snTrackingType,
+      serialNumbers: finalSerialNumbers,
+      batchNumber: snTrackingType === 'shared_batch' ? finalSerial : undefined,
       barcode: barcode.trim() || `899${Math.floor(100000 + Math.random() * 900000)}`,
       category,
       brand: brand.trim() || 'PT. Reycom Integrated Solusi',
@@ -246,7 +473,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <label className="block text-slate-700 font-bold mb-1">Kategori Produk</label>
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
                   {(settings?.categories || CATEGORIES).map(cat => (
@@ -268,57 +495,440 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Codes & Identifiers */}
-          <div className="pt-2 border-t border-slate-100">
-            <div className="flex items-center justify-between mb-2">
+          {/* Section 2: Codes & Serial Number Management */}
+          <div className="pt-3 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-3">
               <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
                 <Barcode className="w-3.5 h-3.5" />
-                <span>Kode SKU & Barcode</span>
+                <span>Kode SKU, Barcode & Serial Number (SN)</span>
               </div>
               <button
                 type="button"
                 onClick={handleAutoGenerateCodes}
-                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
               >
-                <Sparkles className="w-3 h-3" />
-                <span>Generate Otomatis</span>
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                <span>Auto-Generate Semua Kode</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* SKU & Barcode Inputs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-slate-700 font-bold mb-1">SKU / Kode Barang</label>
+                <label className="block text-slate-700 font-bold mb-1">SKU / Kode Barang <span className="text-rose-500">*</span></label>
                 <input
                   type="text"
                   value={sku}
                   onChange={(e) => setSku(e.target.value)}
                   placeholder="IDP-SM81-001"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-mono focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-mono font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Barcode / EAN-13</label>
+                <label className="block text-slate-700 font-bold mb-1">Barcode / EAN-13 <span className="text-rose-500">*</span></label>
                 <input
                   type="text"
                   value={barcode}
                   onChange={(e) => setBarcode(e.target.value)}
                   placeholder="899123456789"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-mono focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold mb-1">Serial Number (SN)</label>
-                <input
-                  type="text"
-                  value={serialNumber}
-                  onChange={(e) => setSerialNumber(e.target.value)}
-                  placeholder="SN001234"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-mono focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-mono font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
             </div>
+
+            {/* Serial Number Tracking Mode Selector */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Boxes className="w-4 h-4 text-blue-600" />
+                  <span>Sistem Pelacakan Serial Number (SN)</span>
+                </label>
+                <span className="text-[11px] font-medium text-slate-500">
+                  Pilih cara pelacakan untuk produk ini:
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                {/* Mode 1: Unique per unit */}
+                <button
+                  type="button"
+                  onClick={() => setSnTrackingType('unique_per_unit')}
+                  className={`text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                    snTrackingType === 'unique_per_unit'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-slate-50/80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-xs flex items-center gap-1.5">
+                      <Boxes className="w-3.5 h-3.5" />
+                      <span>1 SN Unik Tiap Unit</span>
+                    </span>
+                    {snTrackingType === 'unique_per_unit' && (
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                    )}
+                  </div>
+                  <p className={`text-[10px] line-clamp-2 ${snTrackingType === 'unique_per_unit' ? 'text-blue-100' : 'text-slate-500'}`}>
+                    Tiap unit punya SN sendiri (Printer, Scanner, Hardware).
+                  </p>
+                  <div className="mt-2 text-[10px] font-semibold">
+                    <span className={`px-2 py-0.5 rounded-md ${
+                      snTrackingType === 'unique_per_unit'
+                        ? 'bg-blue-700 text-white'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {quantity} SN Terpisah
+                    </span>
+                  </div>
+                </button>
+
+                {/* Mode 2: Shared Batch / Lot */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSnTrackingType('shared_batch');
+                    if (!batchNumber) {
+                      const pfx = category.includes('Ribbon') ? 'RBN' : category.includes('Card') ? 'CRD' : 'LOT';
+                      const code = Math.floor(1000 + Math.random() * 9000);
+                      const b = `LOT-${pfx}-${new Date().getFullYear()}-${code}`;
+                      setBatchNumber(b);
+                      setSerialNumber(b);
+                      setSerialNumbers(Array(quantity).fill(b));
+                    }
+                  }}
+                  className={`text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                    snTrackingType === 'shared_batch'
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                      : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300 hover:bg-slate-50/80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-xs flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>1 SN / Lot Bersama</span>
+                    </span>
+                    {snTrackingType === 'shared_batch' && (
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                    )}
+                  </div>
+                  <p className={`text-[10px] line-clamp-2 ${snTrackingType === 'shared_batch' ? 'text-purple-100' : 'text-slate-500'}`}>
+                    1 nomor batch/lot untuk semua unit (Ribbon, Kartu PVC, Film).
+                  </p>
+                  <div className="mt-2 text-[10px] font-semibold">
+                    <span className={`px-2 py-0.5 rounded-md ${
+                      snTrackingType === 'shared_batch'
+                        ? 'bg-purple-700 text-white'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      1 Lot untuk {quantity} {unit}
+                    </span>
+                  </div>
+                </button>
+
+                {/* Mode 3: No Serial Number */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSnTrackingType('no_sn');
+                    setSerialNumber('-');
+                    setSerialNumbers([]);
+                  }}
+                  className={`text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                    snTrackingType === 'no_sn'
+                      ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
+                      : 'bg-white text-slate-700 border-slate-200 hover:border-slate-400 hover:bg-slate-50/80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-xs flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Tanpa Serial Number</span>
+                    </span>
+                    {snTrackingType === 'no_sn' && (
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                    )}
+                  </div>
+                  <p className={`text-[10px] line-clamp-2 ${snTrackingType === 'no_sn' ? 'text-slate-200' : 'text-slate-500'}`}>
+                    Non-SN / Komoditas umum (Kabel power, pembersih, aksesoris).
+                  </p>
+                  <div className="mt-2 text-[10px] font-semibold">
+                    <span className={`px-2 py-0.5 rounded-md ${
+                      snTrackingType === 'no_sn'
+                        ? 'bg-slate-800 text-white'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      Kontrol Stok Kuantitas
+                    </span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* CONDITIONAL RENDERING BASED ON SELECTED MODE */}
+            {snTrackingType === 'unique_per_unit' && (
+              <div className="bg-blue-50/40 border border-blue-200/80 rounded-2xl p-4">
+                {quantity === 1 ? (
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">
+                      Serial Number (SN) Unit Fisik #1 <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={serialNumbers[0] || serialNumber}
+                        onChange={(e) => handleSnChange(0, e.target.value)}
+                        placeholder="SN-IDP81-1001"
+                        className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-mono font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const code = `SN-${Date.now().toString().slice(-6)}`;
+                          handleSnChange(0, code);
+                        }}
+                        className="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-blue-600 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Generate</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    {/* Bulk Header Toolbar */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-blue-100">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-800 text-xs">
+                            Daftar Serial Number Unit Fisik
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            serialNumbers.filter(s => s?.trim()).length === quantity
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {serialNumbers.filter(s => s?.trim()).length} / {quantity} Unit Terisi
+                          </span>
+                          {duplicateSns.size > 0 && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              <span>{duplicateSns.size} Duplikat</span>
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Tiap unit produk fisik memiliki serial number independen untuk pelacakan garansi, riwayat servis, & peminjaman.
+                        </p>
+                      </div>
+
+                      {/* Quick Action Buttons */}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setShowSeqGenerator(!showSeqGenerator)}
+                          className={`px-2.5 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1 border transition-colors cursor-pointer ${
+                            showSeqGenerator
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'
+                          }`}
+                        >
+                          <Hash className="w-3 h-3" />
+                          <span>Generate Urut</span>
+                          {showSeqGenerator ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowBulkPasteModal(true)}
+                          className="px-2.5 py-1.5 bg-white hover:bg-blue-50 border border-blue-200 text-blue-700 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
+                          <span>Paste Excel</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Kosongkan semua input SN untuk ${quantity} unit ini?`)) {
+                              setSerialNumbers(Array(quantity).fill(''));
+                              setSerialNumber('');
+                            }
+                          }}
+                          className="p-1.5 bg-white hover:bg-rose-50 border border-slate-200 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                          title="Kosongkan semua SN"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Collapsible Sequential Generator Toolbar */}
+                    {showSeqGenerator && (
+                      <div className="bg-white border border-blue-200 rounded-xl p-3 mb-3 shadow-xs animate-in fade-in slide-in-from-top-2 duration-150">
+                        <div className="text-[11px] font-bold text-slate-700 mb-2 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-blue-600" />
+                          <span>Generator Serial Number Berurutan Otomatis:</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-[10px] text-slate-500 font-bold mb-0.5">Prefix / Awalan</label>
+                            <input
+                              type="text"
+                              value={seqPrefix}
+                              onChange={(e) => setSeqPrefix(e.target.value)}
+                              placeholder="SN-IDP81-"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div className="w-24">
+                            <label className="block text-[10px] text-slate-500 font-bold mb-0.5">Nomor Awal</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={seqStart}
+                              onChange={(e) => setSeqStart(Math.max(1, Number(e.target.value)))}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <button
+                              type="button"
+                              onClick={handleApplySequential}
+                              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Terapkan ke {quantity} Unit</span>
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-[10px] text-slate-500 font-mono">
+                          Contoh hasil: {seqPrefix}{String(seqStart).padStart(quantity >= 100 ? 3 : 2, '0')} s/d {seqPrefix}{String(seqStart + quantity - 1).padStart(quantity >= 100 ? 3 : 2, '0')}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Scrollable Grid of Inputs */}
+                    <div className="max-h-60 overflow-y-auto pr-1 space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {Array.from({ length: quantity }).map((_, idx) => {
+                          const val = serialNumbers[idx] || '';
+                          const isDup = val.trim() && duplicateSns.has(val.trim().toLowerCase());
+                          return (
+                            <div
+                              key={idx}
+                              className={`flex items-center gap-2 p-1.5 bg-white rounded-xl border transition-colors ${
+                                isDup
+                                  ? 'border-rose-300 ring-1 ring-rose-300 bg-rose-50/30'
+                                  : val.trim()
+                                  ? 'border-blue-100 hover:border-blue-300'
+                                  : 'border-slate-200 border-dashed'
+                              }`}
+                            >
+                              <span className="w-14 shrink-0 text-center font-bold text-[10px] py-1 px-1.5 bg-slate-100 text-slate-700 rounded-md">
+                                Unit #{idx + 1}
+                              </span>
+                              <input
+                                type="text"
+                                value={val}
+                                onChange={(e) => handleSnChange(idx, e.target.value)}
+                                placeholder={`Serial Number #${idx + 1}`}
+                                className="flex-1 min-w-0 bg-transparent text-slate-800 font-mono text-xs font-medium focus:outline-none"
+                              />
+                              <div className="flex items-center gap-1 shrink-0">
+                                {val && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopySn(val, idx)}
+                                    className="p-1 text-slate-400 hover:text-blue-600 rounded transition-colors cursor-pointer"
+                                    title="Salin SN"
+                                  >
+                                    {copiedIndex === idx ? (
+                                      <Check className="w-3 h-3 text-emerald-600" />
+                                    ) : (
+                                      <Copy className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                )}
+                                {val && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSnChange(idx, '')}
+                                    className="p-1 text-slate-300 hover:text-rose-500 rounded transition-colors cursor-pointer"
+                                    title="Hapus"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {snTrackingType === 'shared_batch' && (
+              <div className="bg-purple-50/50 border border-purple-200/80 rounded-2xl p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                  <label className="block text-slate-700 font-bold">
+                    Nomor Batch / Lot / Serial Number Bersama <span className="text-rose-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pfx = category.includes('Ribbon') ? 'RBN' : category.includes('Card') ? 'CRD' : 'LOT';
+                      const code = Math.floor(1000 + Math.random() * 9000);
+                      const b = `LOT-${pfx}-${new Date().getFullYear()}-${code}`;
+                      setBatchNumber(b);
+                      setSerialNumber(b);
+                      setSerialNumbers(Array(quantity).fill(b));
+                    }}
+                    className="text-[11px] font-bold text-purple-700 hover:text-purple-900 flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+                  >
+                    <Sparkles className="w-3 h-3 text-purple-600" />
+                    <span>Generate Format Lot</span>
+                  </button>
+                </div>
+
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={batchNumber || serialNumber}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBatchNumber(val);
+                      setSerialNumber(val);
+                      setSerialNumbers(Array(quantity).fill(val));
+                    }}
+                    placeholder="Contoh: LOT-RBN-2024-8849 atau BATCH-0012"
+                    className="flex-1 bg-white border border-purple-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-mono font-medium focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="bg-white/80 border border-purple-100 rounded-xl p-3 text-[11px] text-purple-900 flex items-start gap-2">
+                  <Info className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Efisien untuk Bahan Habis Pakai (Consumables):</span> 1 Nomor seri/batch ini secara otomatis dikaitkan ke seluruh <span className="font-bold">{quantity} {unit}</span> produk ini. Sangat ideal untuk Ribbon, Roll Film Laminasi, atau Box Kartu Blank PVC yang diproduksi dari batch pabrik yang identik.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {snTrackingType === 'no_sn' && (
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-start gap-3">
+                <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-slate-800 text-xs">Mode Non-Serial Number Aktif</div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Produk ini tidak memerlukan pelacakan nomor seri individual. Manajemen stok berjalan penuh secara kuantitas (<span className="font-bold text-slate-700">{quantity} {unit}</span>) menggunakan kode SKU dan scan Barcode.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Section 3: Pricing & Stock Values */}
@@ -373,9 +983,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <label className="block text-slate-700 font-bold mb-1">Kuantitas Stok</label>
                 <input
                   type="number"
-                  min="0"
+                  min="1"
                   value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
+                  onChange={(e) => handleQuantityChange(Number(e.target.value))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-bold focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
@@ -526,6 +1136,79 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Modal: Bulk Paste Multi-Serial Number */}
+      {showBulkPasteModal && (
+        <div className="fixed inset-0 z-60 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-bold text-slate-800 text-sm">Paste Serial Number dari Excel / Dokumen</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBulkPasteModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <p className="text-xs text-slate-600">
+                Salin (Copy) kolom Serial Number dari spreadsheet Excel, CSV, atau manifest pengiriman dan tempel di bawah ini (1 nomor per baris atau dipisahkan koma):
+              </p>
+
+              <textarea
+                rows={8}
+                value={bulkPasteText}
+                onChange={(e) => setBulkPasteText(e.target.value)}
+                placeholder="SN-IDP81-2024-001&#10;SN-IDP81-2024-002&#10;SN-IDP81-2024-003&#10;SN-IDP81-2024-004"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-mono text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+
+              {(() => {
+                const detectedCount = bulkPasteText
+                  .split(/[\r\n,]+/)
+                  .map(s => s.trim())
+                  .filter(Boolean).length;
+                return (
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <span className="font-bold text-slate-700">
+                      Terdeteksi: <span className="text-blue-600 font-mono font-bold">{detectedCount}</span> nomor seri
+                    </span>
+                    {detectedCount > quantity && (
+                      <span className="text-[11px] text-amber-600 font-medium">
+                        (Kuantitas stok otomatis disesuaikan ke {detectedCount})
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowBulkPasteModal(false)}
+                className="px-4 py-2 border border-slate-200 rounded-xl text-slate-700 font-bold text-xs hover:bg-slate-100 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyBulkPaste}
+                disabled={!bulkPasteText.trim()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Terapkan Serial Number</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

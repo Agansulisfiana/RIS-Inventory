@@ -162,7 +162,7 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
           className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>+ Penerimaan Barang Masuk</span>
+          <span>Penerimaan Barang Masuk</span>
         </button>
       </div>
 
@@ -461,7 +461,7 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
                     onClick={handleAddItemToReceipt}
                     className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold cursor-pointer transition-colors"
                   >
-                    + Tambahkan Item ke Daftar Penerimaan
+                    Tambahkan Item ke Daftar Penerimaan
                   </button>
                 </div>
 

@@ -15,7 +15,11 @@ import {
   Sparkles,
   Shield,
   Plus,
-  X
+  X,
+  AlertTriangle,
+  Trash2,
+  RotateCcw,
+  Check
 } from 'lucide-react';
 import { WarehouseSettings, User as UserType } from '../../types';
 import { storageService } from '../../services/storage';
@@ -91,6 +95,10 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
   const [pinMessage, setPinMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [clearMessage, setClearMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+  const [clearConfirmationText, setClearConfirmationText] = useState('');
+  const [keepMasterStructure, setKeepMasterStructure] = useState(true);
+  const [isResetDemoModalOpen, setIsResetDemoModalOpen] = useState(false);
   const restoreInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -210,40 +218,57 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
     }
   };
 
-  const handleClearAllData = () => {
-    const confirmed = window.confirm(
-      'PERINGATAN: Anda akan menghapus semua data inventaris, transaksi, demo, backup, dan notifikasi. Data ini akan direset ke keadaan kosong agar dapat dibuat ulang dari awal. Lanjutkan?'
-    );
+  const handleOpenClearModal = () => {
+    setClearConfirmationText('');
+    setIsClearModalOpen(true);
+  };
 
-    if (!confirmed) return;
-
-    storageService.clearAllData();
+  const handleConfirmClearAllData = () => {
+    storageService.clearAllData(keepMasterStructure);
     storageService.addAuditLog({
       action: 'CLEAR_ALL_DATA',
       module: 'system',
       category: 'system',
-      details: 'Menghapus semua data aplikasi untuk memulai dari nol',
+      details: keepMasterStructure 
+        ? 'Menghapus seluruh inventaris & transaksi untuk mulai input data riil (struktur master dipertahankan)' 
+        : 'Menghapus semua data aplikasi & reset total untuk memulai dari nol',
       user: currentUser
     });
 
+    const refreshedSettings = storageService.getSettings();
+    setFormData(refreshedSettings);
+
     setClearMessage({
       type: 'success',
-      text: 'Semua data aplikasi berhasil dihapus. Aplikasi sekarang dalam keadaan kosong dan siap dibuat data real.'
+      text: keepMasterStructure
+        ? 'Semua data barang, transaksi, dan demo berhasil dibersihkan. Struktur kategori & gudang siap digunakan untuk input data riil!'
+        : 'Semua data aplikasi berhasil direset total. Aplikasi sekarang dalam keadaan kosong dari nol.'
     });
 
-    setFormData({
-      ...formData,
-      companyName: '',
-      warehouseName: '',
-      address: '',
-      phone: '',
-      picName: '',
-      warehouses: [],
-      categories: [],
-      rackLocations: [],
-      adminPin: undefined
+    setIsClearModalOpen(false);
+    setClearConfirmationText('');
+    onRefreshData();
+  };
+
+  const handleConfirmResetDemoData = () => {
+    storageService.resetToDefaultData();
+    storageService.addAuditLog({
+      action: 'RESET_DEFAULT_DEMO',
+      module: 'system',
+      category: 'system',
+      details: 'Mereset data aplikasi kembali ke contoh data demo awal',
+      user: currentUser
     });
 
+    const refreshedSettings = storageService.getSettings();
+    setFormData(refreshedSettings);
+
+    setClearMessage({
+      type: 'success',
+      text: 'Data contoh demo (produk printer, ribbon, kartu, dan transaksi) berhasil dimuat kembali.'
+    });
+
+    setIsResetDemoModalOpen(false);
     onRefreshData();
   };
 
@@ -556,19 +581,35 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
             )}
           </div>
 
-          <div className="border border-rose-200 bg-rose-50 rounded-xl p-4 space-y-3">
-            <div className="text-xs font-bold text-rose-700">Zona Berbahaya</div>
-            <div className="text-[11px] text-rose-600">
-              Hapus semua data aplikasi saat ini agar bisa dibuat data real dari nol.
+          <div className="border border-rose-200 bg-rose-50/60 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-rose-100 flex items-center justify-center text-rose-600">
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </div>
+              <div className="text-xs font-bold text-rose-800">Zona Berbahaya & Reset Data</div>
             </div>
-            <button
-              type="button"
-              onClick={handleClearAllData}
-              className="w-full px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span>Hapus Semua Data</span>
-            </button>
+            <div className="text-[11px] text-rose-700 leading-relaxed">
+              Hapus semua data inventaris, transaksi, dan riwayat demo saat ini agar Anda dapat memasukkan data riil perusahaan dari awal (bersih dari nol).
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleOpenClearModal}
+                className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Hapus Semua Data (Mulai Real dari Nol)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsResetDemoModalOpen(true)}
+                className="px-3.5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                title="Muat Ulang Contoh Data Demo"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                <span>Muat Contoh Demo</span>
+              </button>
+            </div>
             {clearMessage && (
               <div className={`rounded-xl border px-3 py-2 text-[11px] font-medium ${
                 clearMessage.type === 'success'
@@ -607,6 +648,208 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
         </div>
 
       </form>
+
+      {/* Modal Konfirmasi Hapus Semua Data */}
+      {isClearModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-rose-50 border-b border-rose-100 p-5 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Konfirmasi Hapus Semua Data</h3>
+                  <p className="text-xs text-rose-700 font-medium mt-0.5">
+                    Tindakan permanen untuk membersihkan data aplikasi
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsClearModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4">
+              <div className="text-xs text-slate-600 leading-relaxed">
+                Anda akan menghapus seluruh data yang ada saat ini agar sistem siap digunakan untuk <strong>input data riil dari nol</strong>.
+              </div>
+
+              {/* Checklist items to be cleared */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5 text-slate-700 font-medium">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Data yang akan dikosongkan (0 data):
+                </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                  <span>Seluruh Produk Inventaris, Unit SN & Stok per Gudang</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                  <span>Semua Riwayat Mutasi Stok (Inbound, Outbound, Transfer)</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                  <span>Semua Peminjaman Unit Demo & Surat Peminjaman</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                  <span>Semua Surat Jalan (Sales Order) & Penerimaan Barang (GR)</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                  <span>Semua Tiket Servis Workshop & Sesi Stock Opname</span>
+                </div>
+              </div>
+
+              {/* Options */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-800 block">Pilihan Pembersihan:</label>
+                <div 
+                  onClick={() => setKeepMasterStructure(true)}
+                  className={`p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                    keepMasterStructure 
+                      ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500' 
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="radio"
+                      checked={keepMasterStructure}
+                      onChange={() => setKeepMasterStructure(true)}
+                      className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-900">Pertahankan Master Kategori & Gudang (Direkomendasikan)</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                        Menghapus semua stok dan transaksi ke 0, tetapi mempertahankan nama perusahaan, daftar gudang, kategori produk, dan lokasi rak agar langsung siap input produk riil.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div 
+                  onClick={() => setKeepMasterStructure(false)}
+                  className={`p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                    !keepMasterStructure 
+                      ? 'border-rose-500 bg-rose-50/50 ring-1 ring-rose-500' 
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="radio"
+                      checked={!keepMasterStructure}
+                      onChange={() => setKeepMasterStructure(false)}
+                      className="mt-0.5 text-rose-600 focus:ring-rose-500"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-900">Reset Total / Kosongkan Penuh</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                        Mereset seluruh data dan mengosongkan profil perusahaan, kategori, serta daftar gudang.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Confirmation input */}
+              <div className="pt-2">
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  Ketik kata <span className="font-black text-rose-600 uppercase tracking-wider">HAPUS</span> untuk konfirmasi:
+                </label>
+                <input
+                  type="text"
+                  value={clearConfirmationText}
+                  onChange={(e) => setClearConfirmationText(e.target.value)}
+                  placeholder="Ketik HAPUS di sini..."
+                  className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 placeholder:font-normal placeholder:text-slate-400"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsClearModalOpen(false)}
+                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClearAllData}
+                disabled={clearConfirmationText.trim().toUpperCase() !== 'HAPUS'}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Ya, Hapus Semua Data Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Muat Contoh Demo */}
+      {isResetDemoModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden">
+            <div className="bg-blue-50 border-b border-blue-100 p-5 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <RotateCcw className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Muat Contoh Data Demo</h3>
+                  <p className="text-xs text-blue-700 font-medium mt-0.5">
+                    Memuat kembali sampel produk printer, ribbon, kartu, dan transaksi
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsResetDemoModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Apakah Anda yakin ingin memuat kembali data contoh demo bawaan sistem? Data saat ini akan digantikan dengan data contoh printer IDP Smart, ribbon, dan kartu.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsResetDemoModalOpen(false)}
+                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmResetDemoData}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Ya, Muat Contoh Demo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

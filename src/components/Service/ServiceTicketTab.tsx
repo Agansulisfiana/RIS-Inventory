@@ -404,7 +404,7 @@ export const ServiceTicketTab: React.FC<ServiceTicketTabProps> = ({
                   onClick={handleAddSparePart}
                   className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold cursor-pointer transition-colors whitespace-nowrap"
                 >
-                  + Tambah
+                  Tambah
                 </button>
               </div>
 
@@ -911,7 +911,7 @@ export const ServiceTicketTab: React.FC<ServiceTicketTabProps> = ({
           className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>+ Buat Tiket Baru</span>
+          <span>Buat Tiket Baru</span>
         </button>
       </div>
 

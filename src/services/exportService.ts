@@ -289,7 +289,15 @@ export const exportService = {
     drawRow('Kode Barang', item.sku || loanInfo?.productCode || '-', 7.5);
 
     // Row 3: Serial Number
-    drawRow('Serial Number', item.serialNumber || loanInfo?.serialNumber || '-', 7.5);
+    const rawSnList: string[] = Array.isArray(loanInfo?.serialNumbers) && loanInfo.serialNumbers.length > 0
+      ? loanInfo.serialNumbers.map((s: any) => String(s).trim()).filter(Boolean)
+      : (loanInfo?.serialNumber || item.serialNumber || '-').split(',').map((s: string) => s.trim()).filter(Boolean);
+
+    const snText = rawSnList.length > 1
+      ? rawSnList.map((sn, idx) => `Unit ${idx + 1}: ${sn}`).join(', ')
+      : (rawSnList[0] || '-');
+    const snRowHeight = rawSnList.length > 2 ? Math.max(7.5, 5.5 + Math.ceil(rawSnList.length / 2) * 3.2) : 7.5;
+    drawRow('Serial Number', snText, snRowHeight);
 
     // Row 4: Kelengkapan / Accessories
     const accNotes = (loanInfo?.accessoriesNotes || '').toLowerCase();
@@ -401,7 +409,7 @@ export const exportService = {
     doc.setFontSize(9);
     doc.text('Yang Menyerahkan,', rightSigBoxX + (sigBoxWidth / 2), currentY + 6, { align: 'center' });
     doc.setFont('helvetica', 'normal');
-    const handedByName = loanInfo?.loanedBy ? `(  ${loanInfo.loanedBy}  )` : '(                                                )';
+    const handedByName = (loanInfo?.handedOverBy || loanInfo?.loanedBy) ? `(  ${loanInfo?.handedOverBy || loanInfo?.loanedBy}  )` : '(                                                )';
     doc.text(handedByName, rightSigBoxX + (sigBoxWidth / 2), currentY + sigBoxHeight - 4, { align: 'center' });
 
     const fileName = `Surat_Peminjaman_Demo_${documentNumber.replace(/[\s/\\:]+/g, '_')}.pdf`;

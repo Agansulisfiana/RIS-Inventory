@@ -113,4 +113,90 @@ describe('demo receipt export', () => {
     assert.equal(result.autoSave, true);
     assert.ok(result.output);
   });
+
+  it('handles multi-unit checkout with multiple serial numbers in PDF export', () => {
+    const result = exportService.exportDemoLoanReceiptPDF(
+      {
+        id: 'u2',
+        sku: 'SKU-02',
+        serialNumber: 'SN-002',
+        name: 'Demo Printer Multi',
+        category: 'Printer',
+        brand: 'RIS',
+        quantity: 3,
+        minStock: 0,
+        unit: 'Unit',
+        price: 0,
+        location: 'Gudang Demo',
+        status: 'tersedia',
+        condition: 'bagus',
+        notes: '',
+        lastUpdated: new Date().toISOString(),
+        updatedBy: 'Admin'
+      } as any,
+      {
+        customerName: 'PT. Multi Usaha',
+        borrowerName: 'Siti',
+        companyName: 'PT. Multi Usaha',
+        borrowerContact: '08130000111',
+        contactEmail: 'siti@multiusaha.co.id',
+        purpose: 'POC Demo 3 Unit',
+        accessoriesNotes: '3 unit Kabel Power, 3 Box',
+        loanDate: '2026-09-16T10:00:00.000Z',
+        expectedReturnDate: '2026-09-30T10:00:00.000Z',
+        quantity: 3,
+        outgoingDocumentNumber: 'SK-2026-002',
+        serialNumber: 'SN-002-A, SN-002-B, SN-002-C',
+        serialNumbers: ['SN-002-A', 'SN-002-B', 'SN-002-C']
+      },
+      { companyName: 'PT. Reycom Integrated Solusi' } as any,
+      { autoSave: false, autoPrint: false }
+    );
+
+    assert.equal(result.fileName, 'Surat_Peminjaman_Demo_SK-2026-002.pdf');
+    assert.ok(result.output);
+  });
+
+  it('correctly uses handedOverBy for signature block in PDF export without changing layout', () => {
+    const result = exportService.exportDemoLoanReceiptPDF(
+      {
+        id: 'u3',
+        sku: 'SKU-03',
+        serialNumber: 'SN-003',
+        name: 'Demo Scanner',
+        category: 'Scanner',
+        brand: 'RIS',
+        quantity: 1,
+        minStock: 0,
+        unit: 'Unit',
+        price: 0,
+        location: 'Gudang Demo',
+        status: 'tersedia',
+        condition: 'bagus',
+        notes: '',
+        lastUpdated: new Date().toISOString(),
+        updatedBy: 'Admin'
+      } as any,
+      {
+        customerName: 'PT. Sukses Bersama',
+        borrowerName: 'Doni Pratama',
+        companyName: 'PT. Sukses Bersama',
+        borrowerContact: '08129999888',
+        purpose: 'POC Demo Bank',
+        loanDate: '2026-09-16T10:00:00.000Z',
+        expectedReturnDate: '2026-09-30T10:00:00.000Z',
+        quantity: 1,
+        outgoingDocumentNumber: 'SK-2026-003',
+        serialNumber: 'SN-003',
+        loanedBy: 'Andi Admin',
+        handedOverBy: 'Siti Aminah (Petugas Gudang Shift Pagi)',
+        handedOverRole: 'Operasional Gudang'
+      },
+      { companyName: 'PT. Reycom Integrated Solusi', picName: 'Warehouse Lead' } as any,
+      { autoSave: false, autoPrint: false }
+    );
+
+    assert.equal(result.fileName, 'Surat_Peminjaman_Demo_SK-2026-003.pdf');
+    assert.ok(result.output);
+  });
 });

@@ -30,6 +30,7 @@ export interface DemoLoanInfo {
   productName?: string;
   productCode?: string;
   serialNumber?: string;
+  serialNumbers?: string[];
   accessoriesNotes?: string;
   loanPeriod?: string;
   loanDate: string;
@@ -39,6 +40,9 @@ export interface DemoLoanInfo {
   notes: string;
   active: boolean;
   loanedBy: string;
+  handedOverBy?: string;
+  handedOverRole?: string;
+  picReceiver?: string;
   documentNumber?: string;
   outgoingDocumentNumber?: string;
   signatureUrl?: string;
@@ -46,10 +50,15 @@ export interface DemoLoanInfo {
   inspectionPhotos?: string[];
 }
 
+export type SnTrackingType = 'unique_per_unit' | 'shared_batch' | 'no_sn';
+
 export interface InventoryItem {
   id: string;
   sku: string;
   serialNumber: string;
+  snTrackingType?: SnTrackingType;
+  serialNumbers?: string[];
+  batchNumber?: string;
   barcode: string;
   name: string;
   category: string; // 'Card Printer', 'Consumables & Ribbon', 'PVC Blank & Smart Card', 'Cleaning Kit', 'Spare Part & Print Head', 'Lamination Film'

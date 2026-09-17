@@ -3,6 +3,7 @@ import {
   PlayCircle, 
   Search, 
   Plus, 
+  Minus,
   ArrowUpRight, 
   ArrowDownLeft, 
   Clock, 
@@ -12,16 +13,30 @@ import {
   Printer, 
   Building, 
   User as UserIcon, 
+  UserCheck,
   Calendar,
   X,
   Check,
-  ShieldAlert
+  ShieldAlert,
+  Layers,
+  Sparkles,
+  Copy,
+  Hash,
+  ArrowRight,
+  ArrowLeft,
+  Phone,
+  Mail,
+  FileCheck,
+  List,
+  Sparkle
 } from 'lucide-react';
 import { InventoryItem, User, WarehouseSettings } from '../../types';
 import { exportService } from '../../services/exportService';
+import { storageService } from '../../services/storage';
 import { RisLogo } from '../Common/RisLogo';
 import { formatCurrency } from '../../utils/currency';
 import { canSelectForDemo, getInventoryStockState } from '../../utils/inventoryStock';
+import { CheckoutDemoModal } from './CheckoutDemoModal';
 
 interface DemoCenterTabProps {
   items: InventoryItem[];
@@ -57,9 +72,10 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
   const [productName, setProductName] = useState('');
   const [productCode, setProductCode] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
+  const [serialNumbers, setSerialNumbers] = useState<string[]>(['']);
   const [accessoriesNotes, setAccessoriesNotes] = useState('');
   const [customerName, setCustomerName] = useState('');
-  const [borrowerName, setBorrowerName] = useState(currentUser.name);
+  const [borrowerName, setBorrowerName] = useState('');
   const [borrowerContact, setBorrowerContact] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [requestFrom, setRequestFrom] = useState('Sales');
@@ -69,6 +85,29 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
   const [loanPeriod, setLoanPeriod] = useState('');
   const [purpose, setPurpose] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Stepper & Layout Mode State
+  const [checkoutStep, setCheckoutStep] = useState<1 | 2 | 3>(1);
+  const [showAllSteps, setShowAllSteps] = useState(false);
+  const [showBulkSnModal, setShowBulkSnModal] = useState(false);
+  const [bulkSnText, setBulkSnText] = useState('');
+
+  // Form Khusus: Yang Menyerahkan Unit Demo
+  const [handedOverBy, setHandedOverBy] = useState(currentUser?.name || '');
+  const [handedOverRole, setHandedOverRole] = useState(currentUser?.department || 'Operasional Gudang & Logistik');
+  const [handoverStaffOption, setHandoverStaffOption] = useState<'current' | 'selected' | 'manual'>('current');
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    try {
+      const usersList = storageService.getUsers();
+      if (usersList && usersList.length > 0) {
+        setAllUsers(usersList);
+      }
+    } catch (err) {
+      console.warn('Could not load users list for demo handover:', err);
+    }
+  }, []);
 
   // Form Check-in Return
   const [returnCondition, setReturnCondition] = useState<InventoryItem['condition']>('bagus');
@@ -86,34 +125,278 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
     return exp < today;
   });
 
-  // Keep every SKU visible in the checkout list. Products that are not ready
-  // remain visible with their status, but cannot be selected for a new loan.
+  // Keep every SKU visible in the checkout list. Products remain selectable
+  // as long as their stock is available (quantity > 0). Products with 0 stock
+  // or in service/repair cannot be selected for a new loan.
   const demoProductOptions = items.map(item => {
     const stock = getInventoryStockState(item);
-    const isReady = canSelectForDemo(item) && stock.readyQuantity > 0;
+    const availableQty = stock.readyQuantity > 0 ? stock.readyQuantity : Math.max(0, item.quantity);
+    const isReady = canSelectForDemo(item) && item.quantity > 0;
 
     return {
       item,
       stock,
+      availableQty,
       isReady
     };
   });
   const availableProductsForDemo = demoProductOptions.filter(option => option.isReady);
   const selectedDemoItem = items.find(item => item.id === selectedDemoItemId);
-  const maxDemoQuantity = selectedDemoItem ? getInventoryStockState(selectedDemoItem).readyQuantity : 1;
+  const maxDemoQuantity = selectedDemoItem 
+    ? (getInventoryStockState(selectedDemoItem).readyQuantity > 0 
+        ? getInventoryStockState(selectedDemoItem).readyQuantity 
+        : Math.max(1, selectedDemoItem.quantity))
+    : 1;
 
   useEffect(() => {
     if (!selectedDemoItem) {
       setProductName('');
       setProductCode('');
       setSerialNumber('');
+      setSerialNumbers(['']);
       return;
     }
 
     setProductName(selectedDemoItem.name);
     setProductCode(selectedDemoItem.sku);
-    setSerialNumber(selectedDemoItem.serialNumber || '');
+    const initialSn = selectedDemoItem.serialNumber || '';
+    setSerialNumber(initialSn);
+    setSerialNumbers(prev => {
+      const targetQty = demoQuantity || 1;
+      const res: string[] = [];
+      for (let i = 0; i < targetQty; i++) {
+        if (i === 0 && (!prev[0] || prev[0] === '')) {
+          res.push(initialSn);
+        } else {
+          res.push(prev[i] || '');
+        }
+      }
+      return res;
+    });
   }, [selectedDemoItem]);
+
+  const handleUpdateQuantity = (newQty: number) => {
+    const safeQty = Math.max(1, Math.min(newQty, maxDemoQuantity));
+    setDemoQuantity(safeQty);
+    setSerialNumbers(prev => {
+      const updated = [...prev];
+      if (updated.length < safeQty) {
+        while (updated.length < safeQty) {
+          updated.push('');
+        }
+      } else if (updated.length > safeQty) {
+        updated.splice(safeQty);
+      }
+      return updated;
+    });
+  };
+
+  const handleUpdateSerialNumber = (index: number, val: string) => {
+    setSerialNumbers(prev => {
+      const copy = [...prev];
+      copy[index] = val;
+      return copy;
+    });
+    if (index === 0) {
+      setSerialNumber(val);
+    }
+  };
+
+  const handlePasteSerialNumbers = (startIndex: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasteData = e.clipboardData.getData('text');
+    if (!pasteData) return;
+
+    const tokens = pasteData.split(/[\r\n,;]+/).map(s => s.trim()).filter(Boolean);
+    if (tokens.length > 1) {
+      e.preventDefault();
+      setSerialNumbers(prev => {
+        const copy = [...prev];
+        tokens.forEach((token, offset) => {
+          const targetIndex = startIndex + offset;
+          if (targetIndex < demoQuantity) {
+            copy[targetIndex] = token;
+          }
+        });
+        return copy;
+      });
+      if (startIndex === 0 && tokens[0]) {
+        setSerialNumber(tokens[0]);
+      }
+    }
+  };
+
+  const handleAutoNumberSerialNumbers = () => {
+    const base = serialNumbers[0]?.trim() || selectedDemoItem?.serialNumber || '';
+    if (!base) return;
+
+    const match = base.match(/^(.*?)(\d+)$/);
+    if (match) {
+      const prefix = match[1];
+      const numStr = match[2];
+      const startNum = parseInt(numStr, 10);
+      const padLen = numStr.length;
+
+      setSerialNumbers(prev => {
+        return prev.map((_, i) => {
+          if (i === 0) return base;
+          const nextNum = startNum + i;
+          return `${prefix}${String(nextNum).padStart(padLen, '0')}`;
+        });
+      });
+    } else {
+      setSerialNumbers(prev => {
+        return prev.map((_, i) => {
+          if (i === 0) return base;
+          return `${base}-${i + 1}`;
+        });
+      });
+    }
+  };
+
+  const quickAccessoriesList = [
+    'Box / Kardus Original',
+    'Kabel Power',
+    'Adaptor Original',
+    'Kabel USB Printer',
+    'Ribbon Sample',
+    'Blank Card PVC'
+  ];
+
+  const handleToggleAccessory = (accName: string) => {
+    const current = accessoriesNotes.trim();
+    if (!current) {
+      setAccessoriesNotes(`1 unit ${accName}`);
+      return;
+    }
+
+    const lowerCurrent = current.toLowerCase();
+    const lowerAcc = accName.toLowerCase();
+
+    if (lowerCurrent.includes(lowerAcc)) {
+      const parts = current
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => !s.toLowerCase().includes(lowerAcc));
+      setAccessoriesNotes(parts.join(', '));
+    } else {
+      setAccessoriesNotes(`${current}, 1 unit ${accName}`);
+    }
+  };
+
+  const handleSelectPeriodPreset = (days: number, label: string) => {
+    setLoanPeriod(label);
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + days);
+    const yyyy = targetDate.getFullYear();
+    const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(targetDate.getDate()).padStart(2, '0');
+    setExpectedReturnDate(`${yyyy}-${mm}-${dd}`);
+  };
+
+  const purposePresets = [
+    'POC Demo Uji Coba Kartu',
+    'Presentasi & Uji Tender',
+    'Testing Integrasi Sistem / SDK',
+    'Pameran / Expo Event'
+  ];
+
+  const handleOpenCheckoutModal = () => {
+    setCheckoutStep(1);
+    if (!outgoingDocumentNumber) {
+      setOutgoingDocumentNumber(`SK-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+    }
+    setIsCheckoutModalOpen(true);
+  };
+
+  const validateStep1 = (showAlert = true): boolean => {
+    if (!companyName.trim()) {
+      if (showAlert) alert('Nama instansi/perusahaan peminjam wajib diisi!');
+      return false;
+    }
+    if (!borrowerName.trim()) {
+      if (showAlert) alert('Nama peminjam / PIC penerima wajib diisi!');
+      return false;
+    }
+    if (!borrowerContact.trim() && !contactEmail.trim()) {
+      if (showAlert) alert('Kontak telepon atau email peminjam wajib diisi!');
+      return false;
+    }
+    if (!outgoingDocumentNumber.trim()) {
+      setOutgoingDocumentNumber(`SK-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+    }
+    return true;
+  };
+
+  const validateStep2 = (showAlert = true): boolean => {
+    if (!selectedDemoItemId) {
+      if (showAlert) alert('Pilih printer demo yang akan dipinjamkan!');
+      return false;
+    }
+    if (!Number.isInteger(demoQuantity) || demoQuantity < 1 || demoQuantity > maxDemoQuantity) {
+      if (showAlert) alert(`Jumlah unit demo harus antara 1 sampai ${maxDemoQuantity} unit.`);
+      return false;
+    }
+    if (!expectedReturnDate) {
+      if (showAlert) alert('Tentukan tanggal estimasi pengembalian!');
+      return false;
+    }
+    return true;
+  };
+
+  const goToStep = (step: 1 | 2 | 3) => {
+    if (step === 1) {
+      setCheckoutStep(1);
+      return;
+    }
+    if (step === 2) {
+      if (validateStep1(true)) {
+        setCheckoutStep(2);
+      }
+      return;
+    }
+    if (step === 3) {
+      if (validateStep1(true) && validateStep2(true)) {
+        setCheckoutStep(3);
+      }
+      return;
+    }
+  };
+
+  const handleApplyBulkSnText = () => {
+    if (!bulkSnText.trim()) {
+      setShowBulkSnModal(false);
+      return;
+    }
+    const tokens = bulkSnText.split(/[\r\n,;]+/).map(s => s.trim()).filter(Boolean);
+    if (tokens.length > 0) {
+      setSerialNumbers(prev => {
+        const copy = [...prev];
+        tokens.forEach((t, i) => {
+          if (i < demoQuantity) {
+            copy[i] = t;
+          }
+        });
+        return copy;
+      });
+      if (tokens[0]) {
+        setSerialNumber(tokens[0]);
+      }
+    }
+    setBulkSnText('');
+    setShowBulkSnModal(false);
+  };
+
+  const isStep1Complete = Boolean(
+    companyName.trim() &&
+    borrowerName.trim() &&
+    (borrowerContact.trim() || contactEmail.trim())
+  );
+
+  const isStep2Complete = Boolean(
+    selectedDemoItemId &&
+    demoQuantity >= 1 &&
+    expectedReturnDate
+  );
 
   const filteredItems = (activeSubTab === 'overdue' ? overdueItems : demoItems).filter(item => {
     const loan = item.demoLoanInfo;
@@ -155,15 +438,19 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
       return;
     }
     if (!companyName.trim()) {
-      alert('Nama perusahaan wajib diisi!');
+      alert('Nama instansi/perusahaan wajib diisi!');
       return;
     }
     if (!borrowerName.trim()) {
-      alert('Nama peminjam wajib diisi!');
+      alert('Nama peminjam / PIC penerima wajib diisi!');
       return;
     }
     if (!borrowerContact.trim() && !contactEmail.trim()) {
       alert('Kontak atau email peminjam wajib diisi!');
+      return;
+    }
+    if (!handedOverBy.trim()) {
+      alert('Nama staf/petugas yang menyerahkan unit wajib diisi!');
       return;
     }
     if (!expectedReturnDate) {
@@ -171,12 +458,20 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
       return;
     }
 
+    const cleanedSnList = serialNumbers.map(s => s.trim());
+    const primarySn = cleanedSnList.find(s => s.length > 0) || serialNumber.trim() || selectedDemoItem?.serialNumber || '';
+    const joinedSn = cleanedSnList.filter(Boolean).join(', ') || primarySn;
+
+    const finalHandedOverBy = handedOverBy.trim() || currentUser.name;
+    const finalHandedOverRole = handedOverRole.trim() || currentUser.department || 'Operasional Gudang & Logistik';
+
     const receiptInfo = {
       outgoingDocumentNumber: outgoingDocumentNumber.trim(),
       documentNumber: outgoingDocumentNumber.trim() || `DO-DEMO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       productName: productName.trim() || selectedDemoItem?.name,
       productCode: productCode.trim() || selectedDemoItem?.sku,
-      serialNumber: serialNumber.trim() || selectedDemoItem?.serialNumber,
+      serialNumber: joinedSn,
+      serialNumbers: cleanedSnList.length > 0 ? cleanedSnList : [primarySn],
       accessoriesNotes: accessoriesNotes.trim(),
       borrowerName: borrowerName.trim(),
       customerName: companyName.trim(),
@@ -192,7 +487,9 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
       purpose: purpose.trim() || 'POC Demo Uji Coba Kartu',
       notes: notes.trim(),
       active: true,
-      loanedBy: currentUser.name,
+      loanedBy: finalHandedOverBy,
+      handedOverBy: finalHandedOverBy,
+      handedOverRole: finalHandedOverRole,
     };
 
     const success = onCheckoutDemo(selectedDemoItemId, receiptInfo);
@@ -208,13 +505,17 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
     setIsCheckoutModalOpen(false);
     setSelectedDemoItemId('');
     setDemoQuantity(1);
+    setSerialNumbers(['']);
     setOutgoingDocumentNumber('');
     setProductName('');
     setProductCode('');
     setSerialNumber('');
     setAccessoriesNotes('');
     setCustomerName('');
-    setBorrowerName(currentUser.name);
+    setBorrowerName('');
+    setHandedOverBy(currentUser?.name || '');
+    setHandedOverRole(currentUser?.department || 'Operasional Gudang & Logistik');
+    setHandoverStaffOption('current');
     setBorrowerContact('');
     setContactEmail('');
     setRequestFrom('Sales');
@@ -270,11 +571,11 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setIsCheckoutModalOpen(true)}
+            onClick={handleOpenCheckoutModal}
             className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
           >
             <ArrowUpRight className="w-4 h-4" />
-            <span>+ Checkout Peminjaman Demo Baru</span>
+            <span>Checkout Peminjaman Demo Baru</span>
           </button>
         </div>
       </div>
@@ -615,7 +916,11 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
                       {/* Serial Number */}
                       <div className="grid grid-cols-[160px_1fr] divide-x divide-black">
                         <div className="p-1.5 font-bold text-slate-900 bg-white">Serial Number</div>
-                        <div className="p-1.5 text-slate-900 font-medium">{latestDemoReceipt.item.serialNumber || latestDemoReceipt.info.serialNumber || '-'}</div>
+                        <div className="p-1.5 text-slate-900 font-medium">
+                          {Array.isArray(latestDemoReceipt.info.serialNumbers) && latestDemoReceipt.info.serialNumbers.length > 1
+                            ? latestDemoReceipt.info.serialNumbers.map((s: string, idx: number) => `Unit ${idx + 1}: ${s}`).join(' • ')
+                            : (latestDemoReceipt.info.serialNumber || latestDemoReceipt.item.serialNumber || '-')}
+                        </div>
                       </div>
 
                       {/* Kelengkapan / Accessories */}
@@ -716,7 +1021,7 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
                   <div className="border border-black p-2 flex flex-col justify-between h-28 text-center">
                     <div className="font-bold text-slate-900">Yang Menyerahkan,</div>
                     <div className="text-slate-900 font-medium">
-                      ( {latestDemoReceipt.info.loanedBy || settings?.picName || '                                          '} )
+                      ( {latestDemoReceipt.info.handedOverBy || latestDemoReceipt.info.loanedBy || settings?.picName || '                                          '} )
                     </div>
                   </div>
                 </div>
@@ -755,273 +1060,19 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
       )}
 
       {/* Modal Checkout Demo Baru */}
-      {isCheckoutModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-6 animate-in fade-in zoom-in-95">
-            <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-2">
-                <ArrowUpRight className="w-5 h-5 text-purple-600" />
-                <h3 className="font-black text-slate-900 text-base">FORM PEMINJAMAN UNIT DEMO (CHECKOUT)</h3>
-              </div>
-              <button onClick={() => setIsCheckoutModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <CheckoutDemoModal
+        isOpen={isCheckoutModalOpen}
+        onClose={() => setIsCheckoutModalOpen(false)}
+        items={items}
+        currentUser={currentUser}
+        settings={settings}
+        onCheckoutDemo={onCheckoutDemo}
+        onShowReceipt={(item, info) => {
+          setLatestDemoReceipt({ item, info });
+          setIsReceiptModalOpen(true);
+        }}
+      />
 
-            <form onSubmit={handleConfirmCheckout} className="p-5 sm:p-6 space-y-4 text-xs max-h-[75vh] overflow-y-auto">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-purple-600">Data Unit</p>
-                    <h4 className="text-sm font-black text-slate-900">Unit & Dokumen Demo</h4>
-                  </div>
-                  <span className="rounded-full border border-purple-200 bg-purple-100 px-2 py-1 text-[10px] font-bold text-purple-700">Form Pinjaman</span>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="mb-1 block font-bold text-slate-700">Pilih Produk Ready Stock <span className="text-rose-500">*</span></label>
-                    <select
-                      required
-                      value={selectedDemoItemId}
-                      onChange={(e) => { setSelectedDemoItemId(e.target.value); setDemoQuantity(1); }}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-                    >
-                      <option value="">-- Pilih Produk Ready Stock --</option>
-                      {demoProductOptions.map(({ item, stock, isReady }) => (
-                        <option key={item.id} value={item.id} disabled={!isReady}>
-                          {item.name} ({isReady ? `Ready: ${stock.readyQuantity} ${item.unit}` : `Tidak tersedia: ${stock.catalogStatus === 'service' ? 'Sedang servis' : stock.isDemo ? 'Sedang dipinjam demo' : 'Stok habis'}`} | Rak: {item.location})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700">No Surat Keluar <span className="text-rose-500">*</span></label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="SK-2026-001"
-                        value={outgoingDocumentNumber}
-                        onChange={(e) => setOutgoingDocumentNumber(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700">Request From</label>
-                      <select
-                        value={requestFrom}
-                        onChange={(e) => setRequestFrom(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-                      >
-                        <option value="Sales">Sales</option>
-                        <option value="Marketing">Marketing</option>
-                        <option value="Customer">Customer</option>
-                        <option value="Warehouse">Warehouse</option>
-                        <option value="Project">Project</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700">Nama Barang</label>
-                      <input
-                        type="text"
-                        value={productName}
-                        onChange={(e) => setProductName(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700">Kode Barang</label>
-                      <input
-                        type="text"
-                        value={productCode}
-                        onChange={(e) => setProductCode(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700">SN Barang</label>
-                      <input
-                        type="text"
-                        value={serialNumber}
-                        onChange={(e) => setSerialNumber(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700">Periode (Lama Waktu)</label>
-                      <input
-                        type="text"
-                        placeholder="14 Hari / 1 Bulan"
-                        value={loanPeriod}
-                        onChange={(e) => setLoanPeriod(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold text-slate-700">Keterangan Aksesoris</label>
-                    <textarea
-                      rows={2}
-                      value={accessoriesNotes}
-                      onChange={(e) => setAccessoriesNotes(e.target.value)}
-                      placeholder="1 unit kabel power, 1 unit adaptor, 1 box ribbon, 100 lembar blank card..."
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-600">Peminjam</p>
-                    <h4 className="text-sm font-black text-slate-900">Identitas & Keperluan</h4>
-                  </div>
-                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">Customer</span>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700">Nama Perusahaan <span className="text-rose-500">*</span></label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: PT. Bank Central Asia Tbk"
-                        value={companyName}
-                        onChange={(e) => setCompanyName(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700">Nama Peminjam <span className="text-rose-500">*</span></label>
-                      <input
-                        type="text"
-                        required
-                        value={borrowerName}
-                        onChange={(e) => setBorrowerName(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-200"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700">Kontak</label>
-                      <input
-                        type="text"
-                        placeholder="0812-xxxx-xxxx"
-                        value={borrowerContact}
-                        onChange={(e) => setBorrowerContact(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-200"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block font-bold text-slate-700">Email</label>
-                      <input
-                        type="email"
-                        placeholder="sales@company.com"
-                        value={contactEmail}
-                        onChange={(e) => setContactEmail(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-200"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block font-bold text-slate-700">Tujuan / Keperluan</label>
-                    <input
-                      type="text"
-                      placeholder="POC Pencetakan Kartu ID Pegawai..."
-                      value={purpose}
-                      onChange={(e) => setPurpose(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-200"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-purple-100 bg-purple-50/60 p-4">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-purple-600">Jadwal</p>
-                    <h4 className="text-sm font-black text-slate-900">Durasi & Pengembalian</h4>
-                  </div>
-                  <span className="rounded-full border border-purple-200 bg-white px-2 py-1 text-[10px] font-bold text-purple-700">Qty Demo</span>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                  <div>
-                    <label className="mb-1 block font-bold text-slate-700">Jumlah Unit Dipinjam untuk Demo <span className="text-rose-500">*</span></label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      max={maxDemoQuantity}
-                      value={demoQuantity}
-                      disabled={!selectedDemoItem}
-                      onChange={(e) => setDemoQuantity(Math.max(1, Number(e.target.value) || 1))}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-800 font-bold shadow-sm outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-200 disabled:cursor-not-allowed disabled:bg-slate-100"
-                    />
-                  </div>
-                  <div className="text-right text-[11px] text-purple-800">
-                    <div className="font-bold">Maks. {maxDemoQuantity} {selectedDemoItem?.unit || 'unit'} siap</div>
-                    <div>Ready setelah checkout: {Math.max(0, maxDemoQuantity - demoQuantity)} {selectedDemoItem?.unit || 'unit'}</div>
-                  </div>
-                </div>
-
-                <div className="mt-3">
-                  <label className="mb-1 block font-bold text-slate-700">Estimasi Tanggal Kembali <span className="text-rose-500">*</span></label>
-                  <input
-                    type="date"
-                    required
-                    value={expectedReturnDate}
-                    onChange={(e) => setExpectedReturnDate(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-800 font-bold shadow-sm outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-200"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block font-bold text-slate-700">Catatan Kelengkapan Tambahan</label>
-                <textarea
-                  rows={2}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Disertakan 1 roll color ribbon & 100 blank card..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-slate-800 shadow-sm outline-none transition focus:border-purple-400 focus:bg-white focus:ring-2 focus:ring-purple-200"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-200 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsCheckoutModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-slate-50"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Keluarkan Unit Demo</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

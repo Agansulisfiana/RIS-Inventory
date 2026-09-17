@@ -52,11 +52,23 @@ test('partially loaned demo stock remains selectable until quantity is exhausted
   assert.equal(canSelectForDemo(item), true);
 });
 
-test('fully loaned out product is no longer selectable', () => {
+test('product with available stock remains selectable even when demo loans are active', () => {
   const item = {
     quantity: 2,
     status: 'demo_loaned',
     demoLoanInfo: { active: true, quantity: 2 }
+  } as any;
+
+  assert.equal(getInventoryStockState(item).readyQuantity, 0);
+  // Still selectable because stock quantity is 2 (not empty)
+  assert.equal(canSelectForDemo(item), true);
+});
+
+test('product is unselectable only when stock is completely empty (kosong)', () => {
+  const item = {
+    quantity: 0,
+    status: 'tersedia',
+    demoLoanInfo: undefined
   } as any;
 
   assert.equal(getInventoryStockState(item).readyQuantity, 0);

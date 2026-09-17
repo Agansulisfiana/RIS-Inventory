@@ -26,7 +26,7 @@ describe('permission checks in storageService', () => {
     const user = { id: 'u-guest', name: 'Guest', role: 'sales' } as any;
     let threw = false;
     try {
-      storageService.addItem({ sku: 'x', serialNumber: 's', barcode: 'b', name: 'X', category: 'Lainnya', brand: 'X', quantity: 1, minStock: 0, unit: 'Unit', price: 0, location: 'Gudang', status: 'tersedia', condition: 'baru', notes: '', lastUpdated: new Date().toISOString(), updatedBy: 'Guest' }, user);
+      storageService.addItem({ sku: 'x', serialNumber: 's', barcode: 'b', name: 'X', category: 'Lainnya', brand: 'X', quantity: 1, minStock: 0, unit: 'Unit', price: 0, location: 'Gudang', status: 'tersedia', condition: 'baru', notes: '', updatedBy: 'Guest' }, user);
     } catch (e: any) {
       threw = true;
     }

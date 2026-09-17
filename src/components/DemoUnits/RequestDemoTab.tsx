@@ -272,7 +272,7 @@ export const RequestDemoTab: React.FC<RequestDemoTabProps> = ({
               className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>+ Pilih Unit</span>
+              <span>Pilih Unit</span>
             </button>
           </div>
 
