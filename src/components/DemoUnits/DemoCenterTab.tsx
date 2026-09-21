@@ -10,6 +10,7 @@ import {
   AlertTriangle, 
   CheckCircle2, 
   FileText, 
+  FileSpreadsheet,
   Printer, 
   Building, 
   User as UserIcon, 
@@ -569,10 +570,30 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => exportService.exportDemoUnitsToExcel(items, settings)}
+            className="px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+            title="Export Rekap Data Unit Demo ke Excel"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Excel</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => exportService.exportDemoUnitsToPDF(items, settings)}
+            className="px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+            title="Download Laporan Akuntabilitas Demo PDF"
+          >
+            <FileText className="w-4 h-4 text-rose-600" />
+            <span>PDF</span>
+          </button>
+
           <button
             onClick={handleOpenCheckoutModal}
-            className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+            className="px-4 sm:px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
           >
             <ArrowUpRight className="w-4 h-4" />
             <span>Checkout Peminjaman Demo Baru</span>
@@ -692,7 +713,7 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
                               {item.name}
                             </button>
                             <div className="text-[10px] text-slate-500 font-mono">
-                              SN: {item.serialNumber} • SKU: {item.sku}
+                              SN: {item.serialNumber} • SKU: {item.sku}{item.barcode ? ` • Barcode: ${item.barcode}` : ''}
                             </div>
                           </div>
                         </div>

@@ -37,7 +37,8 @@ export const exportService = {
       const st = getInventoryStockState(item);
       return ({
       'No': idx + 1,
-      'SKU': item.sku,
+      'SKU / Kode Barang': item.sku,
+      'Barcode / EAN-13': item.barcode || '-',
       'Serial Number': item.serialNumber,
       'Nama Barang': item.name,
       'Kategori': item.category,
@@ -94,17 +95,31 @@ export const exportService = {
   },
 
   exportDemoUnitsToExcel(items: InventoryItem[], settings?: WarehouseSettings) {
-    const demoItems = items.filter(i => i.status === 'on_demo' || (i.demoLoanInfo && i.demoLoanInfo.active));
+    const demoItems = items.filter(i => 
+      i.status === 'on_demo' || 
+      i.status === 'demo_loaned' || 
+      i.category?.toLowerCase().includes('demo') || 
+      (i.demoLoanInfo && i.demoLoanInfo.active) || 
+      i.demoLoanInfo !== undefined
+    );
     const data = demoItems.map((item, idx) => ({
       'No': idx + 1,
+      'SKU / Kode Barang': item.sku || '-',
+      'Barcode / EAN-13': item.barcode || '-',
       'Nama Unit Demo': item.name,
-      'Serial Number': item.serialNumber,
-      'Customer / Instansi': item.demoLoanInfo?.customerName || item.location,
-      'Sales PIC': item.demoLoanInfo?.borrowerName || item.pic,
+      'Serial Number': item.serialNumber || (item.serialNumbers?.length ? item.serialNumbers.join(', ') : '-'),
+      'Kategori': item.category || 'Demo Unit',
+      'Brand': item.brand || '-',
+      'Status Unit': (item.status === 'on_demo' || item.status === 'demo_loaned') ? 'Sedang Dipinjam' : 'Tersedia di Gudang',
+      'Lokasi / Posisi': item.location || '-',
+      'Customer / Instansi': item.demoLoanInfo?.customerName || item.demoLoanInfo?.companyName || (item.status === 'on_demo' || item.status === 'demo_loaned' ? item.location : '-'),
+      'Sales PIC': item.demoLoanInfo?.borrowerName || item.pic || '-',
+      'Kontak PIC': item.demoLoanInfo?.borrowerContact || '-',
       'Tgl Pinjam': item.demoLoanInfo?.loanDate ? this.formatDate(item.demoLoanInfo.loanDate) : '-',
       'Tgl Estimasi Kembali': item.demoLoanInfo?.expectedReturnDate ? this.formatDate(item.demoLoanInfo.expectedReturnDate) : '-',
       'Tujuan': item.demoLoanInfo?.purpose || 'POC Demo',
-      'Catatan': item.notes || '-'
+      'Kondisi': item.condition?.toUpperCase() || 'BAGUS',
+      'Catatan': item.notes || item.demoLoanInfo?.notes || '-'
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -287,10 +302,13 @@ export const exportService = {
     // Row 1: Nama Barang
     drawRow('Nama Barang', item.name || loanInfo?.productName || '-', 7.5);
 
-    // Row 2: Kode Barang
-    drawRow('Kode Barang', item.sku || loanInfo?.productCode || '-', 7.5);
+    // Row 2: Kode Barang / SKU
+    drawRow(['Kode Barang /', 'SKU'], item.sku || loanInfo?.productCode || '-', 7.5);
 
-    // Row 3: Serial Number
+    // Row 3: Barcode / EAN-13
+    drawRow(['Barcode /', 'EAN-13'], item.barcode || '-', 7.5);
+
+    // Row 4: Serial Number
     const rawSnList: string[] = Array.isArray(loanInfo?.serialNumbers) && loanInfo.serialNumbers.length > 0
       ? loanInfo.serialNumbers.map((s: any) => String(s).trim()).filter(Boolean)
       : (loanInfo?.serialNumber || item.serialNumber || '-').split(',').map((s: string) => s.trim()).filter(Boolean);
@@ -376,7 +394,7 @@ export const exportService = {
     drawRow('No Telp & Email', contactParts.join('  /  ') || '-', 7.5, true);
 
     // Row 11: Keterangan (Large Box)
-    const notesHeight = 36;
+    const notesHeight = 28.5;
     doc.rect(startX, currentY, contentWidth, notesHeight);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
@@ -443,18 +461,27 @@ export const exportService = {
 
   exportDemoUnitsToPDF(items: InventoryItem[], settings?: WarehouseSettings) {
     const doc = new jsPDF('landscape');
-    const demoItems = items.filter(i => i.status === 'on_demo' || (i.demoLoanInfo && i.demoLoanInfo.active));
+    const demoItems = items.filter(i => 
+      i.status === 'on_demo' || 
+      i.status === 'demo_loaned' || 
+      i.category?.toLowerCase().includes('demo') || 
+      (i.demoLoanInfo && i.demoLoanInfo.active) || 
+      i.demoLoanInfo !== undefined
+    );
 
     doc.setFontSize(14);
-    doc.text(`LAPORAN PINJAMAN UNIT DEMO (POC) - ${settings?.companyName || 'PT. Reycom Integrated Solusi'}`, 14, 15);
-    doc.setFontSize(10);
-    doc.text(`Dicetak: ${this.formatDate(new Date().toISOString())}`, 14, 22);
+    doc.text(`LAPORAN AKUNTABILITAS PINJAMAN UNIT DEMO (POC) - ${settings?.companyName || 'PT. Reycom Integrated Solusi'}`, 14, 15);
+    doc.setFontSize(9);
+    doc.text(`Dicetak: ${this.formatDate(new Date().toISOString())} | Total: ${demoItems.length} Unit Demo Terdata`, 14, 21);
 
     const tableData = demoItems.map((item, idx) => [
       idx + 1,
+      item.sku || '-',
+      item.barcode || '-',
       item.name || '-',
-      item.serialNumber || '-',
-      item.demoLoanInfo?.customerName || item.location || '-',
+      item.serialNumber || (item.serialNumbers?.length ? item.serialNumbers.join(', ') : '-'),
+      (item.status === 'on_demo' || item.status === 'demo_loaned') ? 'Dipinjam' : 'Ready Gudang',
+      item.demoLoanInfo?.customerName || item.demoLoanInfo?.companyName || item.location || '-',
       item.demoLoanInfo?.borrowerName || item.pic || '-',
       item.demoLoanInfo?.loanDate ? new Date(item.demoLoanInfo.loanDate).toLocaleDateString('id-ID') : '-',
       item.demoLoanInfo?.expectedReturnDate ? new Date(item.demoLoanInfo.expectedReturnDate).toLocaleDateString('id-ID') : '-'
@@ -463,11 +490,24 @@ export const exportService = {
     const safeDemoTableData = tableData.map(row => row.map(cell => (cell === undefined || cell === null) ? '' : cell));
 
     autoTable(doc, {
-      startY: 28,
-      head: [['No', 'Unit Printer', 'SN', 'Customer', 'PIC Sales', 'Tgl Pinjam', 'Tenggat Kembali']],
+      startY: 26,
+      head: [['No', 'SKU / Kode Barang', 'Barcode / EAN-13', 'Nama Unit Demo', 'Serial Number', 'Status', 'Customer / Lokasi', 'Sales PIC', 'Tgl Pinjam', 'Tenggat']],
       body: safeDemoTableData as any,
       theme: 'grid',
-      headStyles: { fillColor: [139, 92, 246] }
+      headStyles: { fillColor: [109, 40, 217], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      styles: { fontSize: 7.5, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 8, halign: 'center' },
+        1: { cellWidth: 26, font: 'courier' },
+        2: { cellWidth: 28, font: 'courier' },
+        3: { cellWidth: 'auto', fontStyle: 'bold' },
+        4: { cellWidth: 24, font: 'courier' },
+        5: { cellWidth: 20, halign: 'center' },
+        6: { cellWidth: 38 },
+        7: { cellWidth: 24 },
+        8: { cellWidth: 20, halign: 'center' },
+        9: { cellWidth: 20, halign: 'center' }
+      }
     });
 
     doc.save(`Laporan_Unit_Demo_${new Date().toISOString().split('T')[0]}.pdf`);
