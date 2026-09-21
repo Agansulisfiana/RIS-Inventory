@@ -1,181 +1,157 @@
-# RIS Inventory
+# RIS Inventory & Demo Unit Management System
 
-Aplikasi inventory dan warehouse management berbasis web yang sedang berjalan untuk kebutuhan operasional PT. RIS. Aplikasi ini dibangun dengan React + Vite dan fokus pada pengelolaan stok, transaksi gudang, unit demo, hingga laporan dan ekspor dokumen.
+Aplikasi web Enterprise Warehouse & Asset Management yang dikembangkan untuk operasional **PT. Reycom Integrated Solusi (RIS)**. Sistem ini mengelola inventaris produk, nomor seri (Serial Number / S/N), pelacakan unit demo pelanggan, transaksi keluar/masuk barang, mutasi gudang, tiket servis, serta penerbitan dokumen resmi (Surat Jalan DO & Surat Peminjaman Demo).
 
-## Ringkasan aplikasi
+---
 
-Aplikasi ini sekarang berfungsi sebagai sistem manajemen gudang yang mencakup:
+## 📌 Ringkasan Sistem
 
-- dashboard overview dan ringkasan operasional
-- katalog produk / master item inventory
-- penjualan dan DO keluar
-- penerimaan barang / goods receipt
-- mutasi stok antar lokasi
-- stock opname / audit stok
-- manajemen unit demo dan peminjaman pelanggan
-- service / maintenance ticket
-- laporan inventaris dan ekspor PDF/Excel
-- pengaturan sistem, user, dan role access
-- mode wallboard publik untuk display TV
-- barcode scanner untuk pencarian dan verifikasi item
+Sistem ini terintegrasi penuh untuk menghubungkan bagian **Gudang (Warehouse)**, **Sales & Marketing**, **Service/Teknisi**, dan **Manajemen**, mencakup:
 
-## Fitur utama yang aktif
+* **Dashboard & Wallboard TV**: Pemantauan inventaris real-time dan display monitor publik.
+* **Master Produk & S/N**: Manajemen barang fisik dengan pelacakan nomor seri unik atau batch.
+* **Transaksi Penjualan & DO**: Pengurangan stok otomatis, penerbitan Surat Jalan (Delivery Order).
+* **Penerimaan Barang (Goods Receipt)**: Penerimaan barang supplier / PO masuk.
+* **Demo Unit Center**: Peminjaman unit uji coba (POC) ke klien, cetak Surat Peminjaman PDF, dan check-in pengembalian.
+* **Mutasi Stok (Stock Movement)**: Transfer antar gudang/rak resmi dengan filter rentang tanggal interaktif.
+* **Stock Opname**: Audit stok fisik vs data sistem dengan rekonsiliasi otomatis.
+* **Pusat Servis & Tiket Perbaikan**: Penanganan barang rusak / maintenance teknisi.
+* **Laporan & Ekspor**: Rekap nilai aset, log pergerakan stok, ekspor ke Excel & PDF.
+* **Barcode & QR Scanner**: Integrasi kamera perangkat untuk pemindaian dan pencetakan label stiker.
+* **Role & Akses Pengguna**: Pembatasan wewenang berdasar peran kerja.
+* **Pengaturan & Manajemen Data**: Backup JSON, Restore, pengaturan gudang/rak resmi, dan reset data.
 
-### 1. Dashboard & TV Wallboard
-- Tampilan dashboard operasional dengan ringkasan inventory
-- Versi public dashboard untuk ditampilkan di TV / monitor wallboard
-- Mode publik dapat diakses dengan parameter URL seperti:
-  - `?view=public-dashboard`
-  - atau hash `#public-dashboard`
+---
 
-### 2. Product & Inventory Management
-- Menambah, mengedit, dan melihat daftar produk
-- Informasi item seperti SKU, serial number, brand, lokasi, dan stok per warehouse
-- Detail item per unit lengkap dengan histori / status stok
-- Upload foto produk langsung dari laptop atau local device ke dalam form produk
-- Mendukung preview gambar produk saat input/edit data
+## 🚀 Modul & Fitur Utama
 
-### 3. Sales Orders & Goods Receipt
-- Modul sales order untuk transaksi keluar barang
-- Modul penerimaan barang dari supplier / receipt
-- Proses transaksi otomatis memengaruhi stok dan data ledger
+### 1. Dashboard Eksekutif & Wallboard TV
+* Ringkasan metrik utama: Total Aset, Unit Tersedia, Unit Sedang Demo, dan Stok Menipis.
+* Grafik tren pergerakan stok dan distribusi kategori barang.
+* **Mode Wallboard Publik (TV Display)**: Tampilan khusus monitor TV gudang tanpa menu navigasi admin, dapat diakses langsung melalui:
+  * URL: `?view=public-dashboard`
+  * atau Hash: `#public-dashboard`
 
-### 4. Stock Movement & Audit
-- Pergerakan stok antar lokasi / warehouse
-- Log transaksi stok lengkap dengan PIC dan catatan waktu
-- Stock opname untuk proses audit dan koreksi stok fisik
+### 2. Master Produk & Inventori (Products)
+* Pencatatan lengkap: SKU, Barcode, Nama Produk, Kategori, Brand, Satuan, Harga Beli/Jual, dan Lokasi Rak.
+* **Pelacakan Serial Number (S/N)**:
+  * *Single Unique S/N*: 1 unit memiliki 1 serial number unik.
+  * *Shared Batch / Non-SN*: Produk batch atau aksesori tanpa serial number individual.
+* **Upload Foto Langsung**: Unggah gambar langsung dari komputer/laptop dengan pratinjau instan.
+* **Generator & Cetak Barcode/QR Code**: Buat stiker label barcode produk siap cetak untuk ditempel pada unit fisik.
 
-### 5. Unit Demo Center
-- Peminjaman unit demo ke pelanggan
-- Checkout / pengeluaran unit demo
-- Pengembalian unit demo (check-in)
-- Pembuatan surat peminjaman unit demo dalam format PDF siap save/print
-- Dokumen bisa dibuka kembali dari list demo yang aktif
+### 3. Sales Order & Cetak Surat Jalan (DO)
+* Pembuatan invoice penjualan customer yang otomatis memotong stok gudang.
+* Pencatatan nomor referensi, alamat tujuan pengiriman, dan nama PIC Sales.
+* **Cetak Dokumen Surat Jalan (DO)**:
+  * Menampilkan data pengirim, tujuan customer, daftar barang, serta rincian nomor seri (S/N).
+  * Kolom tanda tangan resmi: Bagian Gudang, Kurir/Ekspedisi, dan Penerima Customer.
 
-### 6. Service & Maintenance
-- Tracking tiket service untuk unit yang bermasalah
-- Status perbaikan dan penanganan unit
+### 4. Penerimaan Barang (Goods Receipt / GR)
+* Pencatatan barang masuk dari Supplier / Purchase Order (PO).
+* Pilihan lokasi gudang/rak tujuan penerimaan.
+* Otomatis menambah kuantitas stok produk dan mencatat log transaksi masuk.
 
-### 7. Reports & Export
-- Laporan inventaris dan transaksi
-- Ekspor data ke PDF dan Excel
-- Dokumen formal seperti surat peminjaman unit demo dibuat dalam format profesional dengan branding RIS
+### 5. Demo Unit Center (Peminjaman & POC Klien)
+* Khusus mengelola unit display dan mesin percontohan (POC) yang dipinjamkan ke customer (misal: mesin pencetak kartu, scanner, terminal).
+* **Peminjaman (Check-Out)**: Mencatat customer peminjam, PIC Sales, tanggal pinjam, dan estimasi tanggal kembali.
+* **Surat Peminjaman Demo Resmi (PDF)**: Dokumen formal berstandar RIS lengkap dengan kop perusahaan, QR code validasi, dan lembar tanda tangan serah terima.
+* **Monitoring & Notifikasi Overdue**: Peringatan visual jika unit terlambat dikembalikan dari jadwal.
+* **Pengembalian (Check-In)**: Mengembalikan unit ke gudang, evaluasi kondisi fisik, atau konfirmasi pembelian jika unit diubah statusnya menjadi terjual.
 
-### 8. Users & Permission
-- Login berdasarkan user
-- Role-based access control untuk mengatur izin fitur
-- Fitur sensitif dibatasi sesuai role user
+### 6. Mutasi Stok Antar Lokasi (Stock Movement)
+* Pencatatan perpindahan unit antar lokasi (gudang utama, gudang transit, rak, lab service).
+* **Filter Tanggal Interaktif**:
+  * Pilihan cepat: *Hari Ini, 7 Hari Terakhir, 30 Hari Terakhir, Bulan Ini*.
+  * Filter kalender kustom (*Dari Tanggal* s/d *Sampai Tanggal*).
+* **Validasi Lokasi Terintegrasi**: Pilihan tujuan mengacu langsung pada master Gudang & Rak resmi di Pengaturan, dilengkapi opsi *+ Ketik Lokasi Baru* untuk kebutuhan fleksibel.
+* Ekspor log pergerakan stok ke file CSV.
 
-### 9. Backup & Restore Data
-- Backup database manual dalam format JSON
-- Restore data dari file backup JSON langsung di aplikasi
-- Data backup bisa digunakan untuk memulihkan data jika terjadi kehilangan atau migrasi data
+### 7. Stock Opname & Audit Fisik
+* Jadwal dan pencatatan audit stok fisik berkala per gudang/rak.
+* Perhitungan otomatis selisih (*variance*) antara stok fisik vs catatan sistem.
+* Rekonsiliasi instan dengan catatan hasil audit staf gudang.
 
-### 10. Reset Data Kosong / Real Data Setup
-- Fitur reset “Hapus Semua Data” di bagian pengaturan
-- Berguna untuk membersihkan database demo/sample agar aplikasi siap dipakai dengan data asli dari perusahaan
-- Setelah reset, aplikasi berada dalam kondisi kosong dan siap dibuat data real dari awal
+### 8. Service & Maintenance Center
+* Penerbitan tiket servis untuk produk yang mengalami kendala teknis atau klaim garansi.
+* Tracking teknisi penanggung jawab, diagnosis kerusakan, suku cadang, dan estimasi biaya perbaikan.
+* Riwayat status unit: *Menunggu Diagnosa $\rightarrow$ Dalam Perbaikan $\rightarrow$ Selesai $\rightarrow$ Diambil Customer*.
 
-## Fitur terbaru yang ditambahkan
+### 9. Laporan & Analisis Data
+* Laporan komprehensif: Nilai total inventaris (valuation), pergerakan barang keluar-masuk, dan utilisasi unit demo.
+* Ekspor data ke format **Excel (.xlsx)** dan **PDF**.
 
-### Upload gambar produk lokal
-Pada form tambah atau edit produk, pengguna dapat memilih gambar langsung dari file explorer laptop tanpa harus menyalin URL dari internet. File gambar akan diproses dan ditampilkan sebagai preview sebelum data disimpan.
+### 10. Barcode & QR Code Scanner (Kamera Perangkat)
+* Pemindai barcode berbasis web kamera (didukung oleh `html5-qrcode`).
+* Pencarian unit cepat hanya dengan mengarahkan kamera ke label barcode/QR pada kardus atau bodi barang.
 
-### Restore backup JSON di aplikasi
-Di menu pengaturan, terdapat tombol restore backup JSON. Pengguna cukup memilih file backup yang telah diunduh sebelumnya, lalu aplikasi akan memuat data dari file JSON ke localStorage aplikasi.
+### 11. Pengaturan Sistem & Manajemen Database
+* **Pengaturan Perusahaan**: Kop surat, nama instansi, alamat, email, telepon, dan logo.
+* **Pengaturan Master Gudang & Rak**: Kelola daftar nama gudang dan rak penyimpanan resmi.
+* **Master Kategori, Brand, & Satuan Unit**.
+* **Backup Database Manual**: Ekspor seluruh database aplikasi ke file JSON terenkripsi.
+* **Restore Database**: Pulihkan seluruh data dari file backup JSON dalam 1 klik.
+* **Zona Berbahaya (Reset Database)**: Bersihkan data dummy/sample jika ingin memulai aplikasi dari kondisi kosong (*fresh real data setup*).
 
-### Reset semua data aplikasi
-Untuk kebutuhan memulai dari awal dengan data real, tersedia fitur pembersihan seluruh data di zona berbahaya di pengaturan. Fitur ini menghapus data inventaris, transaksi, log, backup, dan notifikasi sehingga sistem benar-benar kosong.
+---
 
-## Panduan operasional
+## 👥 Hak Akses & Peran Pengguna (RBAC)
 
-### Menambah produk baru dengan foto
-1. Buka menu produk atau inventory
-2. Klik tombol tambah produk baru
-3. Isi form produk
-4. Klik tombol “Upload dari Laptop”
-5. Pilih file gambar dari komputer
-6. Simpan produk
+Sistem memiliki pembagian peran (*Role-Based Access Control*):
+1. **Super Admin**: Akses tak terbatas ke seluruh modul, pengaturan sistem, kelola user, dan zona reset database.
+2. **Warehouse Manager**: Pengelolaan penuh inventori, persetujuan mutasi, audit opname, dan laporan.
+3. **Staff Gudang**: Input penerimaan barang, mutasi stok, packing barang keluar, dan scan barcode.
+4. **Sales Representative**: Pembuatan Sales Order, pengajuan peminjaman demo unit customer, dan tracking unit demo.
+5. **Technician / Service**: Pengelolaan tiket servis, diagnostik unit, dan update status perbaikan.
 
-### Backup database
-1. Buka menu Pengaturan
-2. Pilih area Backup Database Manual
-3. Klik tombol “Download Backup”
-4. File JSON akan terunduh ke perangkat
+---
 
-### Restore database
-1. Buka menu Pengaturan
-2. Pilih area Restore Backup JSON
-3. Klik tombol “Restore Backup”
-4. Pilih file JSON backup yang sebelumnya disimpan
-5. Data akan dipulihkan ke aplikasi
+## 🛠️ Spesifikasi Teknologi
 
-### Reset aplikasi agar mulai dari nol
-1. Buka menu Pengaturan
-2. Scroll ke bagian “Zona Berbahaya”
-3. Klik tombol “Hapus Semua Data”
-4. Konfirmasi konfirmasi warning
-5. Data aplikasi akan dibersihkan dan siap dibuat ulang dari awal
+* **Frontend**: React 19, TypeScript, Vite
+* **Styling & Desain**: Tailwind CSS v4, Lucide React Icons, Motion
+* **Visualisasi & Grafik**: Recharts
+* **Dokumen & Cetak**: jsPDF, jspdf-autotable, window print engine
+* **Barcode & QR**: JsBarcode, QRCode, html5-qrcode
+* **Spreadsheet**: XLSX (SheetJS)
+* **Penyimpanan Data**: LocalStorage engine dengan integrasi skema JSON
 
-## Catatan penting
+---
 
-- Data aplikasi disimpan di browser menggunakan localStorage.
-- Untuk penggunaan nyata, disarankan melakukan backup secara berkala untuk mencegah kehilangan data.
-- Fitur reset bersifat destruktif, jadi harus dilakukan dengan kehati-hatian dan konfirmasi.
+## 💻 Panduan Menjalankan Aplikasi
 
-## Teknologi utama
+### Persyaratan Sistem:
+* Node.js versi 18 atau lebih baru
+* NPM atau PNPM
 
-- React 19
-- Vite
-- TypeScript
-- Tailwind CSS
-- Lucide React
-- Recharts
-- Motion
-- jsPDF + jspdf-autotable
-- XLSX
-- html5-qrcode
-- localStorage-based persistence untuk data aplikasi
-
-## Struktur proyek utama
-
-- `src/App.tsx` — entry aplikasi dan state utama
-- `src/components/` — modul UI berdasarkan fungsi (dashboard, sales, demo, reports, settings, dll)
-- `src/services/` — logic pengelolaan data, storage, dan export PDF
-- `src/utils/` — helper seperti permission, barcode, print, dan utility bisnis
-- `src/types.ts` — definisi tipe data utama
-- `tests/` — uji regresi untuk fitur utama
-
-## Cara menjalankan lokal
-
-Persyaratan:
-- Node.js terbaru
-
-Langkah:
+### Instalasi & Menjalankan Dev Server:
 
 ```bash
+# 1. Install seluruh dependensi
 npm install
+
+# 2. Jalankan development server (port 3000)
 npm run dev
 ```
 
-Setelah server aktif, buka URL yang muncul di terminal, biasanya:
-
+Buka browser pada alamat:
 ```text
 http://localhost:3000
 ```
 
-## Build untuk production
+### Build untuk Produksi:
 
 ```bash
+# Build paket siap deploy
 npm run build
+
+# Menjalankan preview hasil build
+npm run preview
 ```
 
-## Catatan aplikasi
+---
 
-- Data aplikasi saat ini disimpan di browser/localStorage sehingga cocok untuk demo dan penggunaan internal.
-- Aplikasi telah dirancang untuk kebutuhan warehouse dan inventory PT. RIS, termasuk modul demo unit dan dokumen formal untuk peminjaman barang.
-- Fitur ekspor PDF dan laporan sudah dibuat untuk kebutuhan print/save dokumen perusahaan.
+## 🔒 Catatan Pemeliharaan Data
 
-## Lisensi
-
-Aplikasi ini dibuat untuk kebutuhan internal operasional perusahaan dan tidak ditujukan untuk publikasi umum tanpa izin.
+* Sistem menggunakan media penyimpanan browser yang persisten.
+* Sangat disarankan bagi staf gudang / admin untuk mengunduh **Backup JSON** secara berkala (misal: setiap akhir pekan atau akhir bulan) melalui menu **Pengaturan $\rightarrow$ Backup Database** untuk cadangan data cadangan fisik.
