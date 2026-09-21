@@ -15,11 +15,21 @@ import {
   FileCheck,
   ShieldAlert,
   Plus,
-  Minus
+  Minus,
+  Layers,
+  Tag,
+  AlertTriangle,
+  RotateCcw
 } from 'lucide-react';
 import { InventoryItem, User, WarehouseSettings } from '../../types';
 import { storageService } from '../../services/storage';
 import { canSelectForDemo, getInventoryStockState } from '../../utils/inventoryStock';
+import {
+  resolveSnTrackingType,
+  getAvailableItemSerialNumbers,
+  getRegisteredSerialNumbers,
+  formatSnDisplay
+} from '../../utils/snManagement';
 
 interface CheckoutDemoModalProps {
   isOpen: boolean;
@@ -53,6 +63,7 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
   const [contactEmail, setContactEmail] = useState('');
   const [borrowerDepartment] = useState('Sales Enterprise');
   const [purpose, setPurpose] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form Fields - Seksi 2: Unit Selection
   const [selectedDemoItemId, setSelectedDemoItemId] = useState('');
@@ -73,6 +84,7 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
   // Initialize defaults on modal open
   useEffect(() => {
     if (isOpen) {
+      setFormError(null);
       if (!outgoingDocumentNumber) {
         setOutgoingDocumentNumber(`SK-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
       }
@@ -93,27 +105,33 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Available stock items
-  const demoProductOptions = items
+  // Safe Available stock items for demo
+  const demoProductOptions = (items || [])
     .filter(item => {
+      if (!item) return false;
+      const cat = (item.category || '').toLowerCase();
+      const name = (item.name || '').toLowerCase();
       const isCardPrinter = 
-        item.category === 'printer' || 
-        item.category === 'mesin' ||
-        item.name.toLowerCase().includes('printer') || 
-        item.name.toLowerCase().includes('zebra') || 
-        item.name.toLowerCase().includes('evolis') || 
-        item.name.toLowerCase().includes('fargo') || 
-        item.name.toLowerCase().includes('datacard') || 
-        item.name.toLowerCase().includes('matika') ||
-        item.name.toLowerCase().includes('smart') ||
-        item.name.toLowerCase().includes('hiti') ||
-        item.name.toLowerCase().includes('seaory');
+        cat.includes('printer') || 
+        cat.includes('mesin') ||
+        cat.includes('hardware') ||
+        cat.includes('scanner') ||
+        name.includes('printer') || 
+        name.includes('zebra') || 
+        name.includes('evolis') || 
+        name.includes('fargo') || 
+        name.includes('datacard') || 
+        name.includes('matika') ||
+        name.includes('smart') ||
+        name.includes('hiti') ||
+        name.includes('seaory') ||
+        !cat.includes('ribbon');
       return isCardPrinter;
     })
     .map(item => {
       const stock = getInventoryStockState(item);
-      const availableQty = stock.readyQuantity > 0 ? stock.readyQuantity : Math.max(0, item.quantity);
-      const isReady = canSelectForDemo(item) && item.quantity > 0;
+      const availableQty = stock.readyQuantity > 0 ? stock.readyQuantity : Math.max(0, item.quantity || 0);
+      const isReady = canSelectForDemo(item) && (item.quantity || 0) > 0;
       return {
         item,
         stock,
@@ -127,16 +145,108 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
   const maxDemoQuantity = Math.max(1, selectedOption?.availableQty ?? 1);
   const remainingAvailableStock = Math.max(0, (selectedOption?.availableQty ?? 0) - demoQuantity);
 
+  const selectedItemTrackingType = selectedDemoItem ? resolveSnTrackingType(selectedDemoItem) : 'unique_per_unit';
+  const availableStockSns = selectedDemoItem ? getAvailableItemSerialNumbers(selectedDemoItem, items) : [];
+  const registeredStockSns = selectedDemoItem ? getRegisteredSerialNumbers(selectedDemoItem) : [];
+
+  // Handle product selection & auto-attaching previously entered SNs
+  const handleSelectProduct = (itemId: string) => {
+    setSelectedDemoItemId(itemId);
+    setFormError(null);
+    const foundOption = demoProductOptions.find(o => o.item.id === itemId);
+    const item = foundOption?.item;
+    if (!item) return;
+
+    const tracking = resolveSnTrackingType(item);
+    if (tracking === 'shared_batch') {
+      const shared = item.batchNumber || item.serialNumber || 'LOT-SHARED';
+      setSerialNumbers([shared]);
+      setSerialNumber(shared);
+      setDemoQuantity(1);
+    } else if (tracking === 'unique_per_unit') {
+      const avail = getAvailableItemSerialNumbers(item, items);
+      const firstSn = avail[0] || item.serialNumber || '';
+      setSerialNumbers([firstSn]);
+      setSerialNumber(firstSn);
+      setDemoQuantity(1);
+    } else {
+      setSerialNumbers(['NON-SN']);
+      setSerialNumber('NON-SN');
+      setDemoQuantity(1);
+    }
+  };
+
   // Handlers for Unit & Serial Number
   const handleUpdateQuantity = (newQty: number) => {
     const clampedQty = Math.max(1, Math.min(newQty, maxDemoQuantity));
     setDemoQuantity(clampedQty);
+    setFormError(null);
+
+    if (!selectedDemoItem) {
+      setSerialNumbers(prev => {
+        const copy = [...prev];
+        while (copy.length < clampedQty) copy.push('');
+        return copy.slice(0, clampedQty);
+      });
+      return;
+    }
+
+    const tracking = resolveSnTrackingType(selectedDemoItem);
+    if (tracking === 'shared_batch') {
+      const shared = selectedDemoItem.batchNumber || selectedDemoItem.serialNumber || 'LOT-SHARED';
+      setSerialNumbers(Array(clampedQty).fill(shared));
+      setSerialNumber(shared);
+      return;
+    }
+    if (tracking === 'no_sn') {
+      setSerialNumbers(Array(clampedQty).fill('NON-SN'));
+      setSerialNumber('NON-SN');
+      return;
+    }
+
+    // unique_per_unit: automatically pre-fill available SNs
+    const avail = getAvailableItemSerialNumbers(selectedDemoItem, items);
     setSerialNumbers(prev => {
       const copy = [...prev];
-      while (copy.length < clampedQty) {
-        copy.push('');
+      for (let i = 0; i < clampedQty; i++) {
+        if (!copy[i] || copy[i].trim() === '') {
+          const candidate = avail.find(s => !copy.includes(s));
+          copy[i] = candidate || (i === 0 ? (selectedDemoItem.serialNumber || '') : '');
+        }
       }
       return copy.slice(0, clampedQty);
+    });
+  };
+
+  // Quick action: Auto-pick first N available SNs
+  const handleAutoPickAvailableSns = () => {
+    if (!selectedDemoItem) return;
+    const avail = getAvailableItemSerialNumbers(selectedDemoItem, items);
+    const assigned = avail.slice(0, demoQuantity);
+    while (assigned.length < demoQuantity) {
+      assigned.push('');
+    }
+    setSerialNumbers(assigned);
+    if (assigned[0]) setSerialNumber(assigned[0]);
+  };
+
+  // Toggle/Select an available SN chip
+  const handleToggleSnChip = (sn: string) => {
+    setSerialNumbers(prev => {
+      const copy = [...prev];
+      const existingIdx = copy.findIndex(s => s.toLowerCase() === sn.toLowerCase());
+      if (existingIdx >= 0) {
+        copy[existingIdx] = '';
+        return copy;
+      }
+      const emptyIdx = copy.findIndex(s => !s || s.trim() === '');
+      if (emptyIdx >= 0 && emptyIdx < demoQuantity) {
+        copy[emptyIdx] = sn;
+      } else {
+        copy[0] = sn;
+      }
+      if (copy[0]) setSerialNumber(copy[0]);
+      return copy.slice(0, demoQuantity);
     });
   };
 
@@ -260,54 +370,59 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
 
   const handleSubmitCheckout = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
 
     // 1. Validasi Peminjam
     if (!companyName.trim()) {
-      alert('Nama instansi / perusahaan peminjam wajib diisi!');
+      setFormError('Nama instansi / perusahaan peminjam wajib diisi.');
       return;
     }
     if (!borrowerName.trim()) {
-      alert('Nama peminjam / PIC penerima wajib diisi!');
+      setFormError('Nama peminjam / PIC penerima wajib diisi.');
       return;
     }
     if (!borrowerContact.trim() && !contactEmail.trim()) {
-      alert('Kontak telepon atau email peminjam wajib diisi!');
+      setFormError('Kontak telepon atau email peminjam wajib diisi.');
       return;
     }
 
     // 2. Validasi Unit & Jadwal
-    if (!selectedDemoItemId) {
-      alert('Pilih printer demo yang akan dipinjamkan!');
+    if (!selectedDemoItemId || !selectedDemoItem) {
+      setFormError('Pilih printer demo yang akan dipinjamkan.');
       return;
     }
     if (!Number.isInteger(demoQuantity) || demoQuantity < 1 || demoQuantity > maxDemoQuantity) {
-      alert(`Jumlah unit demo harus antara 1 sampai ${maxDemoQuantity} unit.`);
+      setFormError(`Jumlah unit demo harus antara 1 sampai ${maxDemoQuantity} unit.`);
       return;
     }
     if (!expectedReturnDate) {
-      alert('Tentukan tanggal estimasi pengembalian unit demo!');
+      setFormError('Tentukan tanggal estimasi pengembalian unit demo.');
       return;
     }
 
     // 3. Validasi Serial Numbers
     const cleanedSnList = serialNumbers.slice(0, demoQuantity).map(s => s.trim());
-    const emptyIndex = cleanedSnList.findIndex(s => s.length === 0);
-    if (emptyIndex !== -1) {
-      alert(`Serial Number untuk Unit #${emptyIndex + 1} belum diisi! Pastikan semua ${demoQuantity} unit terdata nomor serinya.`);
-      return;
+    const tracking = resolveSnTrackingType(selectedDemoItem);
+    
+    if (tracking === 'unique_per_unit') {
+      const emptyIndex = cleanedSnList.findIndex(s => s.length === 0);
+      if (emptyIndex !== -1) {
+        setFormError(`Serial Number untuk Unit #${emptyIndex + 1} belum diisi! Produk ini menggunakan SN per barang, pastikan semua ${demoQuantity} unit terdata nomor serinya.`);
+        return;
+      }
     }
 
     // 4. Validasi Petugas
     if (!handedOverBy.trim()) {
-      alert('Nama petugas/staf yang menyerahkan unit wajib diisi!');
+      setFormError('Nama petugas/staf yang menyerahkan unit wajib diisi.');
       return;
     }
 
     const primarySn = cleanedSnList.find(s => s.length > 0) || serialNumber.trim() || selectedDemoItem?.serialNumber || '';
     const joinedSn = cleanedSnList.filter(Boolean).join(', ') || primarySn;
 
-    const finalHandedOverBy = handedOverBy.trim() || currentUser.name;
-    const finalHandedOverRole = handedOverRole.trim() || currentUser.department || 'Operasional Gudang & Logistik';
+    const finalHandedOverBy = handedOverBy.trim() || currentUser?.name || 'Petugas Gudang';
+    const finalHandedOverRole = handedOverRole.trim() || currentUser?.department || 'Operasional Gudang & Logistik';
 
     const receiptInfo = {
       outgoingDocumentNumber: outgoingDocumentNumber.trim() || `SK-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -373,6 +488,25 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmitCheckout} className="p-4 sm:p-6 space-y-6 text-xs max-h-[75vh] overflow-y-auto">
+          {/* Error Banner */}
+          {formError && (
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start justify-between gap-3 text-rose-800 animate-in fade-in">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-xs font-bold">Validasi Checkout Demo</div>
+                  <div className="text-[11px] text-rose-700 mt-0.5">{formError}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormError(null)}
+                className="text-rose-400 hover:text-rose-700 cursor-pointer p-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           
           {/* ============================================================ */}
           {/* SEKSI 1: BORROWER INFORMATION (INFORMASI PEMINJAM & DOKUMEN) */}
@@ -565,10 +699,7 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
                 <select
                   required
                   value={selectedDemoItemId}
-                  onChange={(e) => { 
-                    setSelectedDemoItemId(e.target.value); 
-                    handleUpdateQuantity(1); 
-                  }}
+                  onChange={(e) => handleSelectProduct(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-800 font-medium shadow-xs outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-100 cursor-pointer"
                 >
                   <option value="">-- Pilih Produk Ready Stock Untuk Demo --</option>
@@ -581,49 +712,79 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
               </div>
 
               {selectedDemoItem && (
-                <div className="rounded-xl border border-purple-200/80 bg-purple-50/60 p-3 flex flex-wrap items-center justify-between gap-3">
-                  <div className="space-y-0.5">
-                    <div className="text-xs font-black text-slate-900">{selectedDemoItem.name}</div>
-                    <div className="text-[11px] text-slate-600 flex flex-wrap items-center gap-2">
-                      <span>SKU: <strong className="font-mono text-purple-800">{selectedDemoItem.sku}</strong></span>
-                      <span>•</span>
-                      <span>Lokasi: <strong className="text-slate-800">{selectedDemoItem.location}</strong></span>
-                      <span>•</span>
-                      <span>Kondisi: <strong className="text-emerald-700 capitalize">{selectedDemoItem.condition || 'Bagus'}</strong></span>
+                <div className="rounded-xl border border-purple-200/80 bg-purple-50/60 p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-black text-slate-900">{selectedDemoItem.name}</div>
+                      <div className="text-[11px] text-slate-600 flex flex-wrap items-center gap-2">
+                        <span>SKU: <strong className="font-mono text-purple-800">{selectedDemoItem.sku}</strong></span>
+                        <span>•</span>
+                        <span>Lokasi: <strong className="text-slate-800">{selectedDemoItem.location}</strong></span>
+                        <span>•</span>
+                        <span>Kondisi: <strong className="text-emerald-700 capitalize">{selectedDemoItem.condition || 'Bagus'}</strong></span>
+                      </div>
+                    </div>
+
+                    {/* Stepper Kuantitas Demo */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center rounded-xl border border-purple-200 bg-white shadow-2xs overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateQuantity(demoQuantity - 1)}
+                          disabled={demoQuantity <= 1}
+                          className="px-2.5 py-1.5 text-purple-700 hover:bg-purple-50 disabled:opacity-30 disabled:hover:bg-white transition cursor-pointer"
+                          title="Kurangi 1 unit"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          max={maxDemoQuantity}
+                          value={demoQuantity}
+                          onChange={(e) => handleUpdateQuantity(parseInt(e.target.value, 10) || 1)}
+                          className="w-12 text-center text-xs font-black text-slate-900 outline-none border-x border-purple-100 py-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateQuantity(demoQuantity + 1)}
+                          disabled={demoQuantity >= maxDemoQuantity}
+                          className="px-2.5 py-1.5 text-purple-700 hover:bg-purple-50 disabled:opacity-30 disabled:hover:bg-white transition cursor-pointer"
+                          title="Tambah 1 unit"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-600">Unit</span>
                     </div>
                   </div>
 
-                  {/* Stepper Kuantitas Demo */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center rounded-xl border border-purple-200 bg-white shadow-2xs overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateQuantity(demoQuantity - 1)}
-                        disabled={demoQuantity <= 1}
-                        className="px-2.5 py-1.5 text-purple-700 hover:bg-purple-50 disabled:opacity-30 disabled:hover:bg-white transition cursor-pointer"
-                        title="Kurangi 1 unit"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <input
-                        type="number"
-                        min={1}
-                        max={maxDemoQuantity}
-                        value={demoQuantity}
-                        onChange={(e) => handleUpdateQuantity(parseInt(e.target.value, 10) || 1)}
-                        className="w-12 text-center text-xs font-black text-slate-900 outline-none border-x border-purple-100 py-1"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateQuantity(demoQuantity + 1)}
-                        disabled={demoQuantity >= maxDemoQuantity}
-                        className="px-2.5 py-1.5 text-purple-700 hover:bg-purple-50 disabled:opacity-30 disabled:hover:bg-white transition cursor-pointer"
-                        title="Tambah 1 unit"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-600">Unit</span>
+                  {/* Tracking Type Badge */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-purple-200/50">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                      selectedItemTrackingType === 'unique_per_unit'
+                        ? 'bg-purple-100 text-purple-900 border-purple-300'
+                        : selectedItemTrackingType === 'shared_batch'
+                        ? 'bg-amber-100 text-amber-900 border-amber-300'
+                        : 'bg-slate-100 text-slate-700 border-slate-300'
+                    }`}>
+                      {selectedItemTrackingType === 'unique_per_unit' ? (
+                        <>
+                          <Tag className="w-3 h-3 text-purple-700" />
+                          SN per Barang (Wajib pilih {demoQuantity} SN berbeda)
+                        </>
+                      ) : selectedItemTrackingType === 'shared_batch' ? (
+                        <>
+                          <Layers className="w-3 h-3 text-amber-700" />
+                          1 SN / Batch Lot Digunakan di Semua Produk
+                        </>
+                      ) : (
+                        <>
+                          <Hash className="w-3 h-3 text-slate-600" />
+                          Produk Non-SN
+                        </>
+                      )}
+                    </span>
                   </div>
                 </div>
               )}
@@ -683,147 +844,260 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
             </div>
 
             {/* Card 2B: Input Serial Number Multi-Unit */}
-            <div className="bg-white rounded-xl border border-purple-100 p-3.5 space-y-3 shadow-2xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+            {selectedDemoItem && selectedItemTrackingType === 'shared_batch' ? (
+              <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3.5 space-y-2.5">
                 <div className="flex items-center gap-2">
-                  <Hash className="w-4 h-4 text-purple-600" />
-                  <div>
-                    <span className="font-black text-slate-900 text-xs">
-                      Serial Number (SN) Unit Demo ({demoQuantity} Unit)
-                    </span>
-                    <span className="text-rose-500 font-bold ml-1">*</span>
-                  </div>
-                </div>
-
-                {/* Status Terisi & Quick Actions */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                    {serialNumbers.slice(0, demoQuantity).filter(s => s.trim()).length} dari {demoQuantity} SN Terisi
+                  <Layers className="w-4 h-4 text-amber-700" />
+                  <span className="text-xs font-black text-amber-900">
+                    1 Serial Number / Batch Lot Digunakan Untuk Semua Unit
                   </span>
-
-                  {demoQuantity > 1 && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleAutoNumberSerialNumbers}
-                        className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-lg transition cursor-pointer"
-                        title="Isi nomor berurutan otomatis berdasarkan Unit #1"
-                      >
-                        <Sparkles className="w-3 h-3 text-indigo-600" />
-                        <span className="hidden sm:inline">Pola Urut Otomatis</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setShowBulkSnModal(!showBulkSnModal)}
-                        className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2 py-0.5 rounded-lg transition cursor-pointer"
-                        title="Paste banyak nomor seri sekaligus"
-                      >
-                        <span className="hidden sm:inline">Paste Banyak SN</span>
-                        <span className="sm:hidden">Paste SN</span>
-                      </button>
-                    </>
-                  )}
+                </div>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Produk ini bertipe <strong>Shared Batch</strong> (1 SN digunakan bersama di semua produk). Nomor seri berikut otomatis dilampirkan ke seluruh <strong>{demoQuantity} unit</strong> peminjaman demo ini dan akan tercetak pada Surat Jalan Demo:
+                </p>
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-lg border border-amber-200">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Nomor Seri / Batch:</span>
+                    <span className="font-mono text-xs font-black text-amber-950 bg-amber-100/80 px-2.5 py-1 rounded border border-amber-300">
+                      {selectedDemoItem.batchNumber || selectedDemoItem.serialNumber || 'LOT-SHARED'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Otomatis Terlampir ke {demoQuantity} Unit
+                  </span>
                 </div>
               </div>
-
-              {/* Popover / Panel Paste Banyak SN */}
-              {showBulkSnModal && (
-                <div className="p-3 bg-indigo-50/80 border border-indigo-200 rounded-xl space-y-2 animate-in fade-in">
-                  <div className="flex items-center justify-between text-xs font-bold text-indigo-900">
-                    <span>Paste Daftar Serial Number ({demoQuantity} Unit)</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowBulkSnModal(false)}
-                      className="text-slate-400 hover:text-slate-700 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+            ) : selectedDemoItem && selectedItemTrackingType === 'no_sn' ? (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-[11px] text-slate-600 flex items-center gap-2">
+                <Hash className="w-4 h-4 text-slate-500 shrink-0" />
+                <span>Produk ini berjenis Non-SN (tanpa nomor seri). Tidak ada nomor seri yang wajib dilampirkan.</span>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-purple-100 p-3.5 space-y-3 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Hash className="w-4 h-4 text-purple-600" />
+                    <div>
+                      <span className="font-black text-slate-900 text-xs">
+                        Serial Number (SN) Unit Demo ({demoQuantity} Unit)
+                      </span>
+                      <span className="text-rose-500 font-bold ml-1">*</span>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-slate-600">
-                    Tempelkan kolom SN dari Excel atau daftar teks (1 serial number per baris atau dipisah koma):
-                  </p>
-                  <textarea
-                    rows={3}
-                    value={bulkSnText}
-                    onChange={(e) => setBulkSnText(e.target.value)}
-                    placeholder="SN-81001&#10;SN-81002&#10;SN-81003"
-                    className="w-full rounded-lg border border-indigo-200 bg-white p-2 font-mono text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-300"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowBulkSnModal(false)}
-                      className="px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-200/60 rounded-lg cursor-pointer"
-                    >
-                      Batal
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleApplyBulkSnText}
-                      className="px-3 py-1 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs cursor-pointer"
-                    >
-                      Terapkan ke {demoQuantity} Unit
-                    </button>
+
+                  {/* Status Terisi & Quick Actions */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                      {serialNumbers.slice(0, demoQuantity).filter(s => s.trim()).length} dari {demoQuantity} SN Terisi
+                    </span>
+
+                    {demoQuantity > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleAutoNumberSerialNumbers}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-lg transition cursor-pointer"
+                          title="Isi nomor berurutan otomatis berdasarkan Unit #1"
+                        >
+                          <Sparkles className="w-3 h-3 text-indigo-600" />
+                          <span className="hidden sm:inline">Pola Urut</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowBulkSnModal(!showBulkSnModal)}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2 py-0.5 rounded-lg transition cursor-pointer"
+                          title="Paste banyak nomor seri sekaligus"
+                        >
+                          <span className="hidden sm:inline">Paste Banyak SN</span>
+                          <span className="sm:hidden">Paste SN</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
-              )}
 
-              {/* Multi-Unit Dynamic Cards Grid */}
-              <div className={`grid ${demoQuantity > 1 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'} gap-2.5`}>
-                {Array.from({ length: demoQuantity }).map((_, idx) => {
-                  const snVal = serialNumbers[idx] || '';
-                  const isFilled = snVal.trim().length > 0;
-                  return (
-                    <div
-                      key={idx}
-                      className={`rounded-xl border p-2.5 transition ${
-                        isFilled
-                          ? 'bg-white border-purple-200/80 shadow-2xs'
-                          : 'bg-slate-50/70 border-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="font-bold text-slate-800 flex items-center gap-1.5 text-[11px]">
-                          <span className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center ${
-                            isFilled ? 'bg-purple-100 text-purple-800' : 'bg-slate-200 text-slate-600'
-                          }`}>
-                            {idx + 1}
-                          </span>
-                          <span>Unit #{idx + 1} {idx === 0 ? '(Unit Utama)' : ''}</span>
-                          <span className="text-rose-500">*</span>
-                        </label>
-                        {isFilled ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>OK</span>
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-medium text-slate-400 italic">
-                            Wajib diisi
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                          <Hash className="w-3.5 h-3.5" />
-                        </div>
-                        <input
-                          type="text"
-                          required
-                          placeholder={idx === 0 ? (selectedDemoItem?.serialNumber || 'Contoh: SN-81-001') : `SN Unit #${idx + 1}`}
-                          value={snVal}
-                          onChange={(e) => handleUpdateSerialNumber(idx, e.target.value)}
-                          onPaste={(e) => handlePasteSerialNumbers(idx, e)}
-                          className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 placeholder-slate-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none transition"
-                        />
+                {/* Interactive Registered SN Chips from Inventory */}
+                {selectedDemoItem && availableStockSns.length > 0 && (
+                  <div className="bg-purple-50/60 border border-purple-200/80 rounded-xl p-3 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-purple-900 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                        Pilih dari SN Terdaftar di Stok ({availableStockSns.length} SN Ready):
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={handleAutoPickAvailableSns}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-white hover:bg-purple-100 border border-purple-200 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                          title="Pilih otomatis SN yang tersedia"
+                        >
+                          <Sparkles className="w-3 h-3 text-purple-600" />
+                          Pilih Otomatis {demoQuantity} SN
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSerialNumbers(Array(demoQuantity).fill(''))}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 hover:text-slate-900 bg-white px-2 py-1 rounded-lg border border-slate-200 transition cursor-pointer"
+                          title="Reset pilihan nomor seri"
+                        >
+                          <RotateCcw className="w-2.5 h-2.5" />
+                          Reset
+                        </button>
                       </div>
                     </div>
-                  );
-                })}
+                    <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                      {availableStockSns.map((sn) => {
+                        const isSelected = serialNumbers.slice(0, demoQuantity).includes(sn);
+                        const assignedUnitIndex = serialNumbers.slice(0, demoQuantity).indexOf(sn);
+                        return (
+                          <button
+                            key={sn}
+                            type="button"
+                            onClick={() => handleToggleSnChip(sn)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                              isSelected
+                                ? 'bg-purple-600 text-white border-purple-700 shadow-2xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300 hover:bg-purple-50/60'
+                            }`}
+                          >
+                            {isSelected ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                <span>{sn} (Unit #{assignedUnitIndex + 1})</span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-2.5 h-2.5 text-slate-400" />
+                                <span>{sn}</span>
+                              </>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Popover / Panel Paste Banyak SN */}
+                {showBulkSnModal && (
+                  <div className="p-3 bg-indigo-50/80 border border-indigo-200 rounded-xl space-y-2 animate-in fade-in">
+                    <div className="flex items-center justify-between text-xs font-bold text-indigo-900">
+                      <span>Paste Daftar Serial Number ({demoQuantity} Unit)</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowBulkSnModal(false)}
+                        className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      Tempelkan kolom SN dari Excel atau daftar teks (1 serial number per baris atau dipisah koma):
+                    </p>
+                    <textarea
+                      rows={3}
+                      value={bulkSnText}
+                      onChange={(e) => setBulkSnText(e.target.value)}
+                      placeholder="SN-81001&#10;SN-81002&#10;SN-81003"
+                      className="w-full rounded-lg border border-indigo-200 bg-white p-2 font-mono text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-300"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowBulkSnModal(false)}
+                        className="px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-200/60 rounded-lg cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleApplyBulkSnText}
+                        className="px-3 py-1 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs cursor-pointer"
+                      >
+                        Terapkan ke {demoQuantity} Unit
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Multi-Unit Dynamic Cards Grid */}
+                <div className={`grid ${demoQuantity > 1 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'} gap-2.5`}>
+                  {Array.from({ length: demoQuantity }).map((_, idx) => {
+                    const snVal = serialNumbers[idx] || '';
+                    const isFilled = snVal.trim().length > 0;
+                    return (
+                      <div
+                        key={idx}
+                        className={`rounded-xl border p-2.5 transition ${
+                          isFilled
+                            ? 'bg-white border-purple-200/80 shadow-2xs'
+                            : 'bg-slate-50/70 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="font-bold text-slate-800 flex items-center gap-1.5 text-[11px]">
+                            <span className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center ${
+                              isFilled ? 'bg-purple-100 text-purple-800' : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {idx + 1}
+                            </span>
+                            <span>Unit #{idx + 1} {idx === 0 ? '(Unit Utama)' : ''}</span>
+                            <span className="text-rose-500">*</span>
+                          </label>
+                          {isFilled ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>OK</span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium text-slate-400 italic">
+                              Wajib diisi
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                              <Hash className="w-3.5 h-3.5" />
+                            </div>
+                            <input
+                              type="text"
+                              required
+                              placeholder={idx === 0 ? (selectedDemoItem?.serialNumber || 'Contoh: SN-81-001') : `SN Unit #${idx + 1}`}
+                              value={snVal}
+                              onChange={(e) => handleUpdateSerialNumber(idx, e.target.value)}
+                              onPaste={(e) => handlePasteSerialNumbers(idx, e)}
+                              className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 placeholder-slate-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none transition"
+                            />
+                          </div>
+
+                          {/* Quick selection dropdown from available SNs */}
+                          {availableStockSns.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[9px] text-slate-500 shrink-0">Pilih SN:</span>
+                              <select
+                                value={snVal}
+                                onChange={(e) => handleUpdateSerialNumber(idx, e.target.value)}
+                                className="w-full text-[10px] font-mono py-0.5 px-1.5 rounded border border-slate-200 bg-slate-50 text-slate-700 outline-none cursor-pointer"
+                              >
+                                <option value="">-- Pilih dari stok --</option>
+                                {availableStockSns.map(s => (
+                                  <option key={s} value={s}>
+                                    {s} {serialNumbers.slice(0, demoQuantity).includes(s) && s !== snVal ? '(Sudah dipilih unit lain)' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Card 2C: Jadwal Pinjam & Aksesoris */}
             <div className="bg-white rounded-xl border border-purple-100 p-3.5 space-y-3 shadow-2xs">
@@ -970,7 +1244,7 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
                     }`}
                   >
                     <div className="text-[11px] font-bold">Akun Login Saat Ini</div>
-                    <div className="text-[9px] text-slate-500 truncate">{currentUser?.name}</div>
+                    <div className="text-[9px] text-slate-500 truncate">{currentUser?.name || 'Petugas Aktif'}</div>
                   </button>
 
                   <button
@@ -1140,8 +1414,8 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
 
               <div className="p-2.5 bg-slate-50 rounded-xl space-y-1">
                 <span className="text-[10px] font-bold text-slate-500 uppercase block">Pihak Yang Menyerahkan</span>
-                <div className="font-black text-sky-900 text-xs">{handedOverBy || currentUser.name}</div>
-                <div className="text-slate-600">{handedOverRole || currentUser.department || 'Operasional Gudang & Logistik'}</div>
+                <div className="font-black text-sky-900 text-xs">{handedOverBy || currentUser?.name || 'Petugas Gudang'}</div>
+                <div className="text-slate-600">{handedOverRole || currentUser?.department || 'Operasional Gudang & Logistik'}</div>
               </div>
 
               <div className="text-[10px] text-emerald-800 bg-emerald-50/80 border border-emerald-200/80 p-2 rounded-xl flex items-center gap-1.5">

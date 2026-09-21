@@ -251,7 +251,10 @@ export default function App() {
         updatedBy: currentUser?.name || 'Admin'
       };
       storageService.saveItem(updatedItem, currentUser || undefined);
-      storageService.addTransaction(newTransaction);
+      storageService.addTransaction({
+        ...newTransaction,
+        unit: itemToUpdate.unit || 'Unit'
+      });
       refreshData();
       showToast('Pergerakan Stok Berhasil', `Unit ${newTransaction.itemName} berhasil dipindahkan dari ${newTransaction.fromLocation} ke ${newTransaction.toLocation}.`);
       setIsStockMovementModalOpen(false);
@@ -380,25 +383,30 @@ export default function App() {
 
       storageService.saveItem(updatedItem, currentUser || undefined);
 
+      const snVal = (info.serialNumbers && info.serialNumbers.length > 0)
+        ? info.serialNumbers.join(', ')
+        : (info.serialNumber || it.serialNumber || '-');
+
       storageService.addTransaction({
         transactionNumber: info.documentNumber || `DO-DEMO-${Date.now().toString().slice(-5)}`,
         timestamp: info.loanDate,
         type: 'Demo Out',
         itemId: it.id,
         itemSku: it.sku,
-        serialNumber: info.serialNumber || it.serialNumber,
+        serialNumber: snVal,
         itemName: it.name,
         fromLocation: it.location,
         toLocation: `Customer: ${info.customerName}`,
         quantity: info.quantity || 1,
+        unit: it.unit || 'Unit',
         pic: info.borrowerName,
         status: 'On Demo',
-        notes: `Peminjaman demo: ${info.purpose}${info.handedOverBy ? ` (Diserahkan oleh: ${info.handedOverBy})` : ''}`,
+        notes: `Peminjaman demo: ${info.quantity || 1} ${it.unit || 'Unit'} - ${info.purpose}${info.handedOverBy ? ` (Diserahkan oleh: ${info.handedOverBy})` : ''}`,
         customer: info.customerName
       });
 
       refreshData();
-      showToast('Checkout Demo Berhasil', `${info.quantity || 1} ${it.unit} ${it.name} dipinjamkan ke ${info.customerName}. Tanda terima siap dibuat secara manual.`);
+      showToast('Checkout Demo Berhasil', `${info.quantity || 1} ${it.unit || 'Unit'} ${it.name} dipinjamkan ke ${info.customerName}. Tanda terima siap dibuat secara manual.`);
       return true;
     } catch (error) {
       console.error('Checkout demo failed:', error);
@@ -444,9 +452,10 @@ export default function App() {
         fromLocation: prevCustomer,
         toLocation: 'Gudang Utama Jakarta - Rak A01',
         quantity: 1,
+        unit: it.unit || 'Unit',
         pic: currentUser?.name || 'Admin',
         status: 'Selesai',
-        notes: `Pengembalian unit demo selesai. Kondisi: ${condition}. ${returnNotes}`
+        notes: `Pengembalian unit demo selesai (+1 ${it.unit || 'Unit'}). Kondisi: ${condition}. ${returnNotes}`
       });
 
       refreshData();
@@ -838,6 +847,7 @@ export default function App() {
             {(activeTab === 'movement' || activeTab === 'transaksi') && (
               <StockMovementTab
                 transactions={transactions}
+                items={items}
                 currentUser={currentUser}
                 settings={settings}
                 onAddNewMovement={handleAddNewMovement}

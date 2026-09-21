@@ -183,7 +183,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
                 <th className="py-3 px-4">Tipe Mutasi</th>
                 <th className="py-3 px-4">No. Ref / Surat Jalan</th>
                 <th className="py-3 px-4">Produk & SKU</th>
-                <th className="py-3 px-4 text-center">Jumlah</th>
+                <th className="py-3 px-4 text-center">Jumlah & Satuan</th>
                 <th className="py-3 px-4">Partner / Peminjam</th>
                 <th className="py-3 px-4">Catatan & Keterangan</th>
                 <th className="py-3 px-4">Petugas Staf</th>
@@ -231,7 +231,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
                           trx.type === 'INBOUND' || trx.type === 'DEMO_RETURN' ? 'text-emerald-600' : 'text-amber-600'
                         }`}>
                           {trx.type === 'INBOUND' ? `+${trx.quantity}` :
-                           trx.type === 'OUTBOUND' ? `-${trx.quantity}` : `${trx.quantity}`}
+                           trx.type === 'OUTBOUND' ? `-${trx.quantity}` : `${trx.quantity}`} {trx.unit || items.find(i => i.id === trx.itemId || i.sku === trx.itemSku)?.unit || 'Unit'}
                         </span>
                       </td>
 

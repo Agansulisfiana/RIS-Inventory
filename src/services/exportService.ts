@@ -76,6 +76,8 @@ export const exportService = {
       'SKU / SN': trx.serialNumber || trx.itemSku || '-',
       'Nama Barang': trx.itemName,
       'Jumlah': trx.quantity,
+      'Satuan': trx.unit || 'Unit',
+      'Qty Unit': `${trx.quantity} ${trx.unit || 'Unit'}`,
       'Dari Lokasi': trx.fromLocation,
       'Ke Lokasi': trx.toLocation,
       'PIC': trx.pic,

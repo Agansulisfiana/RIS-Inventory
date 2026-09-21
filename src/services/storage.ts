@@ -17,6 +17,7 @@ import {
 } from '../types';
 import { warehouseAudio } from '../utils/audio';
 import { getPermissions } from '../utils/permissions';
+import { resolveSnTrackingType, getRegisteredSerialNumbers } from '../utils/snManagement';
 
 const STORAGE_KEYS = {
   USERS: 'invtrack_users_v3',
@@ -1091,6 +1092,20 @@ class StorageService {
         } catch {
           copy.quantity = copy.quantity || 0;
         }
+
+        // ensure SN tracking type and serial numbers are registered
+        copy.snTrackingType = resolveSnTrackingType(copy);
+        if (copy.snTrackingType === 'unique_per_unit') {
+          copy.serialNumbers = getRegisteredSerialNumbers(copy);
+          if (copy.serialNumbers.length > 0 && (!copy.serialNumber || copy.serialNumber === '-' || copy.serialNumber === 'NON-SN')) {
+            copy.serialNumber = copy.serialNumbers[0];
+          }
+        } else if (copy.snTrackingType === 'shared_batch') {
+          if (!copy.batchNumber && copy.serialNumber) {
+            copy.batchNumber = copy.serialNumber;
+          }
+        }
+
         return copy;
       });
       // persist migration silently if needed
@@ -1174,20 +1189,25 @@ class StorageService {
     this.saveItems(items);
 
     // Log transaction
+    const snString = (Array.isArray(newItem.serialNumbers) && newItem.serialNumbers.length > 0)
+      ? newItem.serialNumbers.filter(Boolean).join(', ')
+      : (newItem.serialNumber || '-');
+
     this.addTransaction({
       transactionNumber: `NEW-${Date.now().toString().slice(-6)}`,
       timestamp: new Date().toISOString(),
       type: 'Masuk',
       itemId: newItem.id,
       itemSku: newItem.sku,
-      serialNumber: newItem.serialNumber,
+      serialNumber: snString,
       itemName: newItem.name,
       fromLocation: 'Pendaftaran Master Baru',
       toLocation: newItem.location,
       quantity: newItem.quantity,
+      unit: newItem.unit || 'Unit',
       pic: user?.name || 'Admin',
       status: 'Selesai',
-      notes: `Registrasi master produk baru: ${newItem.name}`
+      notes: `Registrasi master produk baru: ${newItem.name} (+${newItem.quantity} ${newItem.unit || 'Unit'})`
     });
 
     try { warehouseAudio.playSuccess(); } catch {}
@@ -1278,11 +1298,12 @@ class StorageService {
       fromLocation: delta < 0 ? `${targetWarehouse}` : 'Penyesuaian / Restock',
       toLocation: delta < 0 ? 'Keluar / Terjual' : `${targetWarehouse}`,
       quantity: Math.abs(delta),
+      unit: item.unit || 'Unit',
       previousQuantity: prevQty,
       newQuantity: newQty,
       pic: user?.name || 'Operator',
       status: 'Selesai',
-      notes: reason || `Penyesuaian stok (${delta > 0 ? '+' : ''}${delta})`
+      notes: reason || `Penyesuaian stok (${delta > 0 ? '+' : ''}${delta} ${item.unit || 'Unit'})`
     });
 
     try { warehouseAudio.playSuccess(); } catch {}
@@ -1382,6 +1403,25 @@ class StorageService {
         const prevWarehouseQty = Number(item.warehouseStocks[sourceWarehouse] || 0);
         const nextWarehouseQty = Math.max(0, prevWarehouseQty - soldItem.quantity);
         item.warehouseStocks[sourceWarehouse] = nextWarehouseQty;
+        // If specific serial numbers were selected for unique_per_unit items, remove them from available item serialNumbers
+        const trackingType = resolveSnTrackingType(item);
+        const soldSnList = (soldItem.serialNumbers && soldItem.serialNumbers.length > 0)
+          ? soldItem.serialNumbers
+          : (soldItem.serialNumber ? [soldItem.serialNumber] : []);
+
+        if (trackingType === 'unique_per_unit' && soldSnList.length > 0) {
+          const soldSnSet = new Set(soldSnList.map(s => s.trim().toLowerCase()));
+          const currentSns = getRegisteredSerialNumbers(item);
+          item.serialNumbers = currentSns.filter(s => !soldSnSet.has(s.trim().toLowerCase()));
+          if (item.serialNumbers.length > 0) {
+            item.serialNumber = item.serialNumbers[0];
+          }
+        }
+
+        const transactionSn = soldSnList.length > 0
+          ? soldSnList.join(', ')
+          : (soldItem.serialNumber || item.serialNumber || '-');
+
         // update totals and metadata
         const prevQty = item.quantity || 0;
         item.quantity = Object.values(item.warehouseStocks).reduce((s, v) => s + (Number(v) || 0), 0);
@@ -1398,7 +1438,7 @@ class StorageService {
           previousQty: prevQty,
           newQty: item.quantity,
           user,
-          reason: `Penjualan ${order.orderNumber} (from ${sourceWarehouse})`
+          reason: `Penjualan ${order.orderNumber} (from ${sourceWarehouse}) - SN: ${transactionSn}`
         });
 
         this.addTransaction({
@@ -1407,18 +1447,19 @@ class StorageService {
           type: 'Penjualan',
           itemId: item.id,
           itemSku: item.sku,
-          serialNumber: item.serialNumber,
+          serialNumber: transactionSn,
           itemName: item.name,
           fromLocation: sourceWarehouse,
           toLocation: `Customer: ${order.customerName}`,
           quantity: soldItem.quantity,
+          unit: item.unit || 'Unit',
           previousQuantity: prevQty,
           newQuantity: item.quantity,
           pic: user?.name || order.salesPic,
           status: 'Selesai',
           customer: order.customerName,
           totalPrice: soldItem.totalPrice,
-          notes: `Penjualan ${soldItem.quantity} ${item.unit} via ${order.orderNumber}`
+          notes: `Penjualan ${soldItem.quantity} ${item.unit || 'Unit'} via ${order.orderNumber}. SN: ${transactionSn}`
         });
       }
     });
@@ -1501,13 +1542,14 @@ class StorageService {
           fromLocation: `Supplier: ${receipt.supplierName}`,
           toLocation: destWarehouse,
           quantity: rcvItem.quantityReceived,
+          unit: item.unit || 'Unit',
           previousQuantity: prevQty,
           newQuantity: item.quantity,
           pic: user?.name || receipt.receiverPic,
           status: 'Selesai',
           supplier: receipt.supplierName,
           totalPrice: rcvItem.totalCost,
-          notes: `Penerimaan barang masuk PO: ${receipt.poNumber || '-'}`
+          notes: `Penerimaan barang masuk PO: ${receipt.poNumber || '-'} (+${rcvItem.quantityReceived} ${item.unit || 'Unit'})`
         });
       }
     });

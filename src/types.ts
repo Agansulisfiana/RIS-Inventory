@@ -142,6 +142,7 @@ export interface StockTransaction {
   partnerOrBorrower?: string;
   performedBy?: string;
   performedByRole?: string;
+  unit?: string;
 }
 
 // Sales Order (Penjualan & DO Keluar)
@@ -150,6 +151,8 @@ export interface SalesOrderItem {
   name: string;
   sku: string;
   serialNumber?: string;
+  serialNumbers?: string[];
+  snTrackingType?: SnTrackingType;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
