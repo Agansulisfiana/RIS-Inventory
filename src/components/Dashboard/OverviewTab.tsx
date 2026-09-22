@@ -349,7 +349,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Activity Trend Chart */}
-        <div className="lg:col-span-2 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+        <div className="lg:col-span-2 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 min-w-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h2 className="font-black font-heading text-slate-900 text-base">
@@ -390,7 +390,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         </div>
 
         {/* Category Breakdown Donut */}
-        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 flex flex-col justify-between">
+        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 flex flex-col justify-between min-w-0">
           <div>
             <h2 className="font-black font-heading text-slate-900 text-base">
               DISTRIBUSI KATEGORI PRODUK
@@ -470,25 +470,25 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               </div>
             ) : (
               lowStockItems.slice(0, 4).map(item => (
-                <div key={item.id} className="p-3.5 bg-rose-50/40 rounded-xl border border-rose-100 flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-3">
+                <div key={item.id} className="p-3.5 bg-rose-50/40 rounded-xl border border-rose-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-3 min-w-0">
                     <img 
                       src={item.imageUrl || 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?w=80&auto=format&fit=crop&q=80'} 
                       alt={item.name} 
                       className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" 
                     />
-                    <div>
-                      <div className="font-bold text-slate-900 hover:text-blue-600 cursor-pointer line-clamp-1" onClick={() => onSelectItem(item)}>
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-900 hover:text-blue-600 cursor-pointer truncate" onClick={() => onSelectItem(item)}>
                         {item.name}
                       </div>
-                      <div className="text-[10px] text-slate-500 font-mono">
+                      <div className="text-[10px] text-slate-500 font-mono truncate">
                         SKU: {item.sku} • Lokasi: {item.location}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="text-right">
+                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-rose-100">
+                    <div className="text-left sm:text-right">
                       <div className="font-black text-rose-700 text-xs">Sisa {item.quantity} {item.unit}</div>
                       <div className="text-[10px] text-slate-400">Min: {item.minStock} {item.unit}</div>
                     </div>
@@ -596,7 +596,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs min-w-[720px]">
             <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-2.5 px-3">No. Transaksi</th>

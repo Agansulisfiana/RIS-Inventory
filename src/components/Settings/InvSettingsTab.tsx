@@ -19,12 +19,15 @@ import {
   AlertTriangle,
   Trash2,
   RotateCcw,
-  Check
+  Check,
+  Smartphone,
+  QrCode
 } from 'lucide-react';
 import { WarehouseSettings, User as UserType } from '../../types';
 import { storageService } from '../../services/storage';
 import { getPermissions } from '../../utils/permissions';
 import RoleManagement from './RoleManagement';
+import { PWAInstallButton } from '../PWA/PWAInstallButton';
 
 interface InvSettingsTabProps {
   settings: WarehouseSettings;
@@ -499,6 +502,65 @@ export const InvSettingsTab: React.FC<InvSettingsTabProps> = ({
                     🗑 Nonaktifkan PIN
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PWA & Multi-Device Field Mode */}
+        <div className="space-y-4 pt-4 border-t border-slate-100">
+          <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+            <Smartphone className="w-4 h-4 text-blue-600" />
+            <span>Mode Aplikasi Lapangan (PWA &amp; Akses Multi-Device)</span>
+          </h2>
+
+          <div className="p-4 sm:p-5 bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-2xl shadow-sm border border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <div className="font-bold text-sm text-white flex items-center gap-2">
+                  <span>PWA Lapangan Siap Digunakan</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono">
+                    ONLINE &amp; OFFLINE READY
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1">
+                  Staf gudang dan sales dapat menginstal aplikasi langsung ke layar utama HP/tablet (Android &amp; iOS) untuk scan barcode cepat tanpa perlu membuka browser.
+                </p>
+              </div>
+              <div className="shrink-0 w-full sm:w-auto">
+                <PWAInstallButton variant="settings" className="w-full sm:w-auto" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/10 text-xs">
+              <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                <div className="font-bold text-blue-300 mb-1 flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>Android &amp; PDA Gudang</span>
+                </div>
+                <div className="text-[11px] text-slate-300">
+                  Buka di Google Chrome &rarr; Ketuk menu titik tiga &rarr; Pilih <strong>&ldquo;Install app&rdquo;</strong> atau <strong>&ldquo;Tambahkan ke Layar Utama&rdquo;</strong>.
+                </div>
+              </div>
+
+              <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                <div className="font-bold text-blue-300 mb-1 flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>iPhone &amp; iPad (iOS)</span>
+                </div>
+                <div className="text-[11px] text-slate-300">
+                  Buka di Safari &rarr; Ketuk ikon <strong>Share</strong> &rarr; Pilih <strong>&ldquo;Add to Home Screen&rdquo;</strong>.
+                </div>
+              </div>
+
+              <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                <div className="font-bold text-blue-300 mb-1 flex items-center gap-1.5">
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>Kamera Barcode Cepat</span>
+                </div>
+                <div className="text-[11px] text-slate-300">
+                  Didukung pemindaian barcode langsung via kamera ponsel untuk cek stok dan pengembalian unit demo di lapangan.
+                </div>
               </div>
             </div>
           </div>

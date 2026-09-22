@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="#ffffff"/>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="#2563eb" stroke-width="8" opacity="0.15"/>
+  <g transform="translate(56, 136) scale(0.85)">
+    <!-- Stylized RIS Identity Symbol -->
+    <path d="M40 180 L140 40 L240 180 Z" fill="#2563eb"/>
+    <path d="M140 40 L340 40 L240 180 Z" fill="#1d4ed8"/>
+    <path d="M240 180 L340 40 L440 180 Z" fill="#3b82f6"/>
+    <circle cx="240" cy="110" r="32" fill="#ffffff"/>
+    <text x="240" y="240" font-family="'Segoe UI', 'Inter', sans-serif" font-size="54" font-weight="900" fill="#0f172a" text-anchor="middle" letter-spacing="4">REYCOM</text>
+    <text x="240" y="275" font-family="'Segoe UI', 'Inter', sans-serif" font-size="20" font-weight="700" fill="#2563eb" text-anchor="middle" letter-spacing="3">INVENTORY &amp; DEMO</text>
+  </g>
+</svg>

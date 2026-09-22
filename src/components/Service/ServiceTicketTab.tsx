@@ -942,12 +942,12 @@ export const ServiceTicketTab: React.FC<ServiceTicketTabProps> = ({
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-400" />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Filter className="w-4 h-4 text-slate-400 shrink-0" />
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
-            className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
           >
             <option value="Semua">Semua Status</option>
             <option value="Proses">Sedang Proses</option>
@@ -961,7 +961,7 @@ export const ServiceTicketTab: React.FC<ServiceTicketTabProps> = ({
       {/* Ticket Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs min-w-[850px]">
             <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-3.5 px-4">No. Ticket</th>

@@ -464,12 +464,12 @@ export const StockOpnameTab: React.FC<StockOpnameTabProps> = ({
         <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
           <div className="bg-slate-50 px-3.5 py-2 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600 font-medium">
             <span>Daftar Produk Audit ({filteredRows.length} item)</span>
-            <span className="text-[11px] text-blue-600 font-semibold">
+            <span className="hidden sm:inline text-[11px] text-blue-600 font-semibold">
               Ketik angka fisik langsung di kolom berbingkai biru atau gunakan tombol - / +
             </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[780px]">
               <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider">
                 <tr>
                   <th className="py-3 px-3.5">Produk & SKU</th>

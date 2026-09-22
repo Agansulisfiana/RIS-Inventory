@@ -225,7 +225,7 @@ export const StockMovementTab: React.FC<StockMovementTabProps> = ({
 
       {/* Filter and Action Bar matching Screenshot */}
       <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0 w-full sm:w-auto">
           
           {/* Semua Jenis Dropdown */}
           <select
@@ -460,7 +460,7 @@ export const StockMovementTab: React.FC<StockMovementTabProps> = ({
       {/* Main Table matching Screenshot */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs min-w-[880px]">
             <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-3 px-3.5">No. Transaksi</th>

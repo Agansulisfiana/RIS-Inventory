@@ -512,7 +512,7 @@ export const SalesOrdersTab: React.FC<SalesOrdersTabProps> = ({
       {/* Orders Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs min-w-[850px]">
             <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-3.5 px-4">No. Invoice & Tanggal</th>
