@@ -1517,6 +1517,20 @@ class StorageService {
         item.quantity = Object.values(item.warehouseStocks).reduce((s, v) => s + (Number(v) || 0), 0);
         item.lastUpdated = new Date().toISOString();
         item.updatedBy = user?.name || receipt.receiverPic;
+
+        // If Goods Receipt includes unit serial numbers, append them to the inventory item
+        if (Array.isArray(rcvItem.serialNumbers) && rcvItem.serialNumbers.length > 0) {
+          const currentSns = Array.isArray(item.serialNumbers)
+            ? [...item.serialNumbers]
+            : (item.serialNumber && item.serialNumber !== '-' && item.serialNumber !== 'NON-SN' ? [item.serialNumber] : []);
+          const cleanNewSns = rcvItem.serialNumbers.map(s => String(s).trim()).filter(Boolean);
+          const combined = Array.from(new Set([...currentSns, ...cleanNewSns]));
+          item.serialNumbers = combined;
+          if (!item.serialNumber || item.serialNumber === '-' || item.serialNumber === 'NON-SN') {
+            item.serialNumber = cleanNewSns[0] || item.serialNumber;
+          }
+        }
+
         items[idx] = item;
 
         this.recordStockMutationAudit({

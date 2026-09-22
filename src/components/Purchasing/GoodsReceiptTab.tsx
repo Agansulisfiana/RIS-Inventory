@@ -12,10 +12,12 @@ import {
   X, 
   Check, 
   Trash2,
-  DollarSign
+  DollarSign,
+  Barcode
 } from 'lucide-react';
 import { GoodsReceipt, InventoryItem, User, WarehouseSettings } from '../../types';
 import { formatCurrency } from '../../utils/currency';
+import { SerialNumberInputManager } from '../Common/SerialNumberInputManager';
 
 interface GoodsReceiptTabProps {
   goodsReceipts: GoodsReceipt[];
@@ -49,6 +51,8 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
     itemId: string;
     name: string;
     sku: string;
+    serialNumber?: string;
+    serialNumbers?: string[];
     quantityReceived: number;
     unitCost: number;
     totalCost: number;
@@ -57,6 +61,8 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
   const [selectedItemId, setSelectedItemId] = useState('');
   const [receiveQty, setReceiveQty] = useState<number>(5);
   const [unitCost, setUnitCost] = useState<number>(0);
+  const [isSnTracking, setIsSnTracking] = useState<boolean>(false);
+  const [receiptItemSns, setReceiptItemSns] = useState<string[]>([]);
 
   const filteredReceipts = goodsReceipts.filter(r => 
     r.receiptNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -73,6 +79,11 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
     setSupplierName('');
     setNotes('');
     setReceiptCart([]);
+    setSelectedItemId('');
+    setReceiveQty(5);
+    setUnitCost(0);
+    setIsSnTracking(false);
+    setReceiptItemSns([]);
     setIsModalOpen(true);
   };
 
@@ -81,7 +92,26 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
     const it = items.find(i => i.id === itemId);
     if (it) {
       setUnitCost(it.costPrice || it.price || 0);
+      const isUnique = it.snTrackingType === 'unique_per_unit' || 
+                       (it.category && it.category.toLowerCase().includes('printer')) ||
+                       (Array.isArray(it.serialNumbers) && it.serialNumbers.length > 0) ||
+                       (it.serialNumber && it.serialNumber !== '-' && it.serialNumber !== 'NON-SN');
+      setIsSnTracking(Boolean(isUnique));
+      setReceiptItemSns(Array(receiveQty).fill(''));
+    } else {
+      setIsSnTracking(false);
+      setReceiptItemSns([]);
     }
+  };
+
+  const handleReceiveQtyChange = (val: number) => {
+    const qty = Math.max(1, val);
+    setReceiveQty(qty);
+    setReceiptItemSns(prev => {
+      const next = [...prev];
+      while (next.length < qty) next.push('');
+      return next.slice(0, qty);
+    });
   };
 
   const handleAddItemToReceipt = () => {
@@ -89,12 +119,21 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
     const it = items.find(i => i.id === selectedItemId);
     if (!it) return;
 
+    const cleanSns = isSnTracking ? receiptItemSns.map(s => s.trim()).filter(Boolean) : [];
+    if (isSnTracking && cleanSns.length < receiveQty) {
+      if (!confirm(`Perhatian: Baru ${cleanSns.length} dari ${receiveQty} Serial Number yang diisi. Apakah ingin tetap menambahkan item ini?`)) {
+        return;
+      }
+    }
+
     setReceiptCart([
       ...receiptCart,
       {
         itemId: it.id,
         name: it.name,
         sku: it.sku,
+        serialNumber: cleanSns[0] || it.serialNumber,
+        serialNumbers: cleanSns.length > 0 ? cleanSns : undefined,
         quantityReceived: receiveQty,
         unitCost,
         totalCost: receiveQty * unitCost
@@ -104,6 +143,8 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
     setSelectedItemId('');
     setReceiveQty(5);
     setUnitCost(0);
+    setIsSnTracking(false);
+    setReceiptItemSns([]);
   };
 
   const handleRemoveFromReceipt = (idx: number) => {
@@ -337,7 +378,26 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {selectedReceiptDetail.items.map((it, idx) => (
                     <tr key={idx}>
-                      <td className="p-2.5 font-bold text-slate-800">{it.name}</td>
+                      <td className="p-2.5">
+                        <div className="font-bold text-slate-800">{it.name}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">SKU: {it.sku}</div>
+                        {it.serialNumbers && it.serialNumbers.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {it.serialNumbers.map((sn, sIdx) => (
+                              <span key={sIdx} className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-200">
+                                {sn}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {!it.serialNumbers && it.serialNumber && it.serialNumber !== '-' && it.serialNumber !== 'NON-SN' && (
+                          <div className="mt-1">
+                            <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-200">
+                              SN: {it.serialNumber}
+                            </span>
+                          </div>
+                        )}
+                      </td>
                       <td className="p-2.5 text-center font-black text-indigo-700">+{it.quantityReceived}</td>
                       <td className="p-2.5 text-right">{formatCurrency(it.unitCost)}</td>
                       <td className="p-2.5 text-right font-black">{formatCurrency(it.totalCost)}</td>
@@ -440,7 +500,7 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
                         type="number"
                         min="1"
                         value={receiveQty}
-                        onChange={(e) => setReceiveQty(Number(e.target.value))}
+                        onChange={(e) => handleReceiveQtyChange(Number(e.target.value))}
                         className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 font-bold text-slate-800 focus:outline-none"
                       />
                     </div>
@@ -456,10 +516,57 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
                     </div>
                   </div>
 
+                  {selectedItemId && (
+                    <div className="pt-2 border-t border-slate-200/70">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={isSnTracking}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setIsSnTracking(checked);
+                              if (checked && receiptItemSns.length !== receiveQty) {
+                                setReceiptItemSns(Array(receiveQty).fill(''));
+                              }
+                            }}
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                          />
+                          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <Barcode className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>Input Serial Number (SN) per Unit Produk</span>
+                          </span>
+                        </label>
+                      </div>
+
+                      {isSnTracking && (
+                        <div className="mt-2">
+                          {(() => {
+                            const curItem = items.find(i => i.id === selectedItemId);
+                            return (
+                              <SerialNumberInputManager
+                                quantity={receiveQty}
+                                serialNumbers={receiptItemSns}
+                                onChangeSerialNumbers={setReceiptItemSns}
+                                productName={curItem?.name}
+                                category={curItem?.category}
+                                brand={curItem?.brand}
+                                sku={curItem?.sku}
+                                itemId={curItem?.id}
+                                existingItems={items}
+                                compact={true}
+                              />
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     onClick={handleAddItemToReceipt}
-                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold cursor-pointer transition-colors"
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold cursor-pointer transition-colors shadow-xs"
                   >
                     Tambahkan Item ke Daftar Penerimaan
                   </button>
@@ -480,7 +587,20 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
                       <tbody className="divide-y divide-slate-100">
                         {receiptCart.map((c, idx) => (
                           <tr key={idx}>
-                            <td className="p-2.5 font-bold text-slate-900">{c.name}</td>
+                            <td className="p-2.5">
+                              <div className="font-bold text-slate-900">{c.name}</div>
+                              <div className="text-[10px] text-slate-500 font-mono">SKU: {c.sku}</div>
+                              {c.serialNumbers && c.serialNumbers.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1 items-center">
+                                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                                    {c.serialNumbers.length} SN:
+                                  </span>
+                                  <span className="text-[10px] font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                                    {c.serialNumbers[0]} {c.serialNumbers.length > 1 ? `s/d ${c.serialNumbers[c.serialNumbers.length - 1]}` : ''}
+                                  </span>
+                                </div>
+                              )}
+                            </td>
                             <td className="p-2.5 text-center font-bold text-indigo-700">+{c.quantityReceived}</td>
                             <td className="p-2.5 text-right">{formatCurrency(c.unitCost)}</td>
                             <td className="p-2.5 text-right font-black text-slate-900">{formatCurrency(c.totalCost)}</td>
@@ -488,7 +608,7 @@ export const GoodsReceiptTab: React.FC<GoodsReceiptTabProps> = ({
                               <button
                                 type="button"
                                 onClick={() => handleRemoveFromReceipt(idx)}
-                                className="text-rose-500 hover:text-rose-700"
+                                className="text-rose-500 hover:text-rose-700 p-1"
                               >
                                 <Trash2 className="w-4 h-4 mx-auto" />
                               </button>

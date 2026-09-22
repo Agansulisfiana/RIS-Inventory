@@ -184,6 +184,7 @@ export interface GoodsReceiptItem {
   name: string;
   sku: string;
   serialNumber?: string;
+  serialNumbers?: string[];
   quantityReceived: number;
   unitCost: number;
   totalCost: number;

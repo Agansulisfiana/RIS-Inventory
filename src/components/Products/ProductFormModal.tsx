@@ -23,6 +23,8 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { InventoryItem, User, WarehouseSettings, SnTrackingType } from '../../types';
+import { SerialNumberInputManager } from '../Common/SerialNumberInputManager';
+import { storageService } from '../../services/storage';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -667,208 +669,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
             {/* CONDITIONAL RENDERING BASED ON SELECTED MODE */}
             {snTrackingType === 'unique_per_unit' && (
-              <div className="bg-blue-50/40 border border-blue-200/80 rounded-2xl p-4">
-                {quantity === 1 ? (
-                  <div>
-                    <label className="block text-slate-700 font-bold mb-1">
-                      Serial Number (SN) Unit Fisik #1 <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={serialNumbers[0] || serialNumber}
-                        onChange={(e) => handleSnChange(0, e.target.value)}
-                        placeholder="SN-IDP81-1001"
-                        className="flex-1 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-mono font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const code = `SN-${Date.now().toString().slice(-6)}`;
-                          handleSnChange(0, code);
-                        }}
-                        className="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-blue-600 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Generate</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    {/* Bulk Header Toolbar */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-blue-100">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-800 text-xs">
-                            Daftar Serial Number Unit Fisik
-                          </span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            serialNumbers.filter(s => s?.trim()).length === quantity
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            {serialNumbers.filter(s => s?.trim()).length} / {quantity} Unit Terisi
-                          </span>
-                          {duplicateSns.size > 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 flex items-center gap-1">
-                              <AlertCircle className="w-3 h-3" />
-                              <span>{duplicateSns.size} Duplikat</span>
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          Tiap unit produk fisik memiliki serial number independen untuk pelacakan garansi, riwayat servis, & peminjaman.
-                        </p>
-                      </div>
-
-                      {/* Quick Action Buttons */}
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setShowSeqGenerator(!showSeqGenerator)}
-                          className={`px-2.5 py-1.5 rounded-lg font-bold text-[11px] flex items-center gap-1 border transition-colors cursor-pointer ${
-                            showSeqGenerator
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'
-                          }`}
-                        >
-                          <Hash className="w-3 h-3" />
-                          <span>Generate Urut</span>
-                          {showSeqGenerator ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setShowBulkPasteModal(true)}
-                          className="px-2.5 py-1.5 bg-white hover:bg-blue-50 border border-blue-200 text-blue-700 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
-                        >
-                          <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
-                          <span>Paste Excel</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (confirm(`Kosongkan semua input SN untuk ${quantity} unit ini?`)) {
-                              setSerialNumbers(Array(quantity).fill(''));
-                              setSerialNumber('');
-                            }
-                          }}
-                          className="p-1.5 bg-white hover:bg-rose-50 border border-slate-200 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
-                          title="Kosongkan semua SN"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Collapsible Sequential Generator Toolbar */}
-                    {showSeqGenerator && (
-                      <div className="bg-white border border-blue-200 rounded-xl p-3 mb-3 shadow-xs animate-in fade-in slide-in-from-top-2 duration-150">
-                        <div className="text-[11px] font-bold text-slate-700 mb-2 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-blue-600" />
-                          <span>Generator Serial Number Berurutan Otomatis:</span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-[10px] text-slate-500 font-bold mb-0.5">Prefix / Awalan</label>
-                            <input
-                              type="text"
-                              value={seqPrefix}
-                              onChange={(e) => setSeqPrefix(e.target.value)}
-                              placeholder="SN-IDP81-"
-                              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
-                          </div>
-                          <div className="w-24">
-                            <label className="block text-[10px] text-slate-500 font-bold mb-0.5">Nomor Awal</label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={seqStart}
-                              onChange={(e) => setSeqStart(Math.max(1, Number(e.target.value)))}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
-                          </div>
-                          <div className="flex items-end">
-                            <button
-                              type="button"
-                              onClick={handleApplySequential}
-                              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Terapkan ke {quantity} Unit</span>
-                            </button>
-                          </div>
-                        </div>
-                        <div className="mt-2 text-[10px] text-slate-500 font-mono">
-                          Contoh hasil: {seqPrefix}{String(seqStart).padStart(quantity >= 100 ? 3 : 2, '0')} s/d {seqPrefix}{String(seqStart + quantity - 1).padStart(quantity >= 100 ? 3 : 2, '0')}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Scrollable Grid of Inputs */}
-                    <div className="max-h-60 overflow-y-auto pr-1 space-y-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {Array.from({ length: quantity }).map((_, idx) => {
-                          const val = serialNumbers[idx] || '';
-                          const isDup = val.trim() && duplicateSns.has(val.trim().toLowerCase());
-                          return (
-                            <div
-                              key={idx}
-                              className={`flex items-center gap-2 p-1.5 bg-white rounded-xl border transition-colors ${
-                                isDup
-                                  ? 'border-rose-300 ring-1 ring-rose-300 bg-rose-50/30'
-                                  : val.trim()
-                                  ? 'border-blue-100 hover:border-blue-300'
-                                  : 'border-slate-200 border-dashed'
-                              }`}
-                            >
-                              <span className="w-14 shrink-0 text-center font-bold text-[10px] py-1 px-1.5 bg-slate-100 text-slate-700 rounded-md">
-                                Unit #{idx + 1}
-                              </span>
-                              <input
-                                type="text"
-                                value={val}
-                                onChange={(e) => handleSnChange(idx, e.target.value)}
-                                placeholder={`Serial Number #${idx + 1}`}
-                                className="flex-1 min-w-0 bg-transparent text-slate-800 font-mono text-xs font-medium focus:outline-none"
-                              />
-                              <div className="flex items-center gap-1 shrink-0">
-                                {val && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCopySn(val, idx)}
-                                    className="p-1 text-slate-400 hover:text-blue-600 rounded transition-colors cursor-pointer"
-                                    title="Salin SN"
-                                  >
-                                    {copiedIndex === idx ? (
-                                      <Check className="w-3 h-3 text-emerald-600" />
-                                    ) : (
-                                      <Copy className="w-3 h-3" />
-                                    )}
-                                  </button>
-                                )}
-                                {val && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSnChange(idx, '')}
-                                    className="p-1 text-slate-300 hover:text-rose-500 rounded transition-colors cursor-pointer"
-                                    title="Hapus"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <SerialNumberInputManager
+                quantity={quantity}
+                serialNumbers={serialNumbers}
+                onChangeSerialNumbers={(sns) => {
+                  setSerialNumbers(sns);
+                  if (sns.length > 0 && sns[0]) {
+                    setSerialNumber(sns[0]);
+                  }
+                }}
+                productName={name}
+                category={category}
+                brand={brand}
+                sku={sku}
+                itemId={itemToEdit?.id}
+                existingItems={storageService.getItems()}
+              />
             )}
 
             {snTrackingType === 'shared_batch' && (
