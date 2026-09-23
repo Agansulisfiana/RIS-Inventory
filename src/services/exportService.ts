@@ -261,9 +261,16 @@ export const exportService = {
     doc.setLineWidth(0.3);
     doc.setDrawColor(0, 0, 0);
 
-    const drawRow = (label: string | string[], value: string, rowHeight: number, isHighlighted: boolean = false, customRenderer?: (x: number, y: number, w: number, h: number) => void) => {
+    const drawRow = (
+      label: string | string[], 
+      value: string, 
+      rowHeight: number, 
+      isHighlighted: boolean = false, 
+      customRenderer?: (x: number, y: number, w: number, h: number) => void,
+      valueBold: boolean = false
+    ) => {
       if (isHighlighted) {
-        doc.setFillColor(254, 243, 214); // #FEF3C7 soft warm beige/gold
+        doc.setFillColor(254, 243, 199); // #FEF3C7 soft warm amber/gold
         doc.rect(startX, currentY, contentWidth, rowHeight, 'FD');
       } else {
         doc.rect(startX, currentY, contentWidth, rowHeight);
@@ -277,19 +284,18 @@ export const exportService = {
       doc.setFontSize(9);
       doc.setTextColor(0, 0, 0);
       if (Array.isArray(label)) {
-        if (label.length === 2) {
-          doc.text(label[0], startX + 2.5, currentY + 4.2);
-          doc.text(label[1], startX + 2.5, currentY + 8.2);
-        } else {
-          label.forEach((l, i) => doc.text(l, startX + 2.5, currentY + 4.2 + (i * 4)));
-        }
+        const lineSpacing = 3.6;
+        const totalTextHeight = (label.length - 1) * lineSpacing;
+        const startTextY = currentY + (rowHeight / 2) - (totalTextHeight / 2) + 1.2;
+        label.forEach((l, i) => doc.text(l, startX + 2.5, startTextY + (i * lineSpacing)));
       } else {
         doc.text(label, startX + 2.5, currentY + (rowHeight / 2) + 1.2);
       }
 
       // Value column
-      doc.setFont('helvetica', 'normal');
+      doc.setFont('helvetica', valueBold ? 'bold' : 'normal');
       doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
       if (customRenderer) {
         customRenderer(col2X, currentY, col2Width, rowHeight);
       } else {
@@ -302,32 +308,41 @@ export const exportService = {
     // Row 1: Nama Barang
     drawRow('Nama Barang', item.name || loanInfo?.productName || '-', 7.5);
 
-    // Row 2: Kode Barang / SKU
-    drawRow(['Kode Barang /', 'SKU'], item.sku || loanInfo?.productCode || '-', 7.5);
+    // Row 2: Kode Barang (Clean single line, matching preview)
+    drawRow('Kode Barang', item.sku || loanInfo?.productCode || '-', 7.5);
 
-    // Row 3: Barcode / EAN-13
-    drawRow(['Barcode /', 'EAN-13'], item.barcode || '-', 7.5);
-
-    // Row 4: Serial Number
+    // Row 3: Serial Number (Dynamic height, comma-separated list)
     const rawSnList: string[] = Array.isArray(loanInfo?.serialNumbers) && loanInfo.serialNumbers.length > 0
       ? loanInfo.serialNumbers.map((s: any) => String(s).trim()).filter(Boolean)
       : (loanInfo?.serialNumber || item.serialNumber || '-').split(',').map((s: string) => s.trim()).filter(Boolean);
 
-    const snText = rawSnList.length > 1
-      ? rawSnList.map((sn, idx) => `Unit ${idx + 1}: ${sn}`).join(', ')
-      : (rawSnList[0] || '-');
-    const snRowHeight = rawSnList.length > 2 ? Math.max(7.5, 5.5 + Math.ceil(rawSnList.length / 2) * 3.2) : 7.5;
-    drawRow('Serial Number', snText, snRowHeight);
+    const snText = rawSnList.length > 0 ? rawSnList.join(', ') : '-';
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const snLines = doc.splitTextToSize(snText, col2Width - 6);
+    const snRowHeight = Math.max(7.5, 4.2 + (snLines.length * 3.6));
+
+    drawRow('Serial Number', snText, snRowHeight, false, (x, y, w, h) => {
+      if (snLines.length <= 1) {
+        doc.text(snLines[0] || '-', x + 2.5, y + (h / 2) + 1.2);
+      } else {
+        snLines.forEach((line: string, idx: number) => {
+          doc.text(line, x + 2.5, y + 4.2 + (idx * 3.6));
+        });
+      }
+    });
 
     // Row 4: Kelengkapan / Accessories
     const accNotes = (loanInfo?.accessoriesNotes || '').toLowerCase();
     const hasBox = accNotes.includes('box') || accNotes.includes('kardus') || accNotes.includes('dus');
     const hasCable = accNotes.includes('kabel') || accNotes.includes('power') || accNotes.includes('cable');
     const hasAdaptor = accNotes.includes('adaptor') || accNotes.includes('adapter') || accNotes.includes('charger');
+    const hasAccessoriesNotes = Boolean(loanInfo?.accessoriesNotes && loanInfo.accessoriesNotes.trim());
+    const accRowHeight = hasAccessoriesNotes ? 18 : 12;
 
-    drawRow(['Kelengkapan /', 'Accessories'], '', 26, false, (x, y, w, h) => {
+    drawRow(['Kelengkapan /', 'Accessories'], '', accRowHeight, false, (x, y, w, h) => {
       // Checkbox row
-      const boxY = y + 2.5;
+      const boxY = y + 3;
       const boxSize = 3.2;
 
       // 1. Box / Kardus
@@ -359,11 +374,14 @@ export const exportService = {
       }
       doc.text('Adaptor', adX + 5, boxY + 2.6);
 
-      // Additional accessories notes text below checkboxes
-      const noteText = loanInfo?.accessoriesNotes || '';
-      if (noteText) {
+      // Additional accessories notes text below checkboxes (matching italicized style)
+      if (hasAccessoriesNotes) {
+        doc.setFont('helvetica', 'italic');
         doc.setFontSize(8.5);
-        doc.text(noteText, x + 3, boxY + 8, { maxWidth: w - 6 });
+        doc.setTextColor(60, 60, 60);
+        doc.text(loanInfo.accessoriesNotes, x + 3, boxY + 9, { maxWidth: w - 6 });
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
       }
     });
@@ -375,7 +393,7 @@ export const exportService = {
     } else if (returnDate) {
       periodStr += `(s/d ${formatShortDate(returnDate)})`;
     }
-    drawRow(['Periode / Lama Waktu', 'Peminjaman'], periodStr || '-', 9);
+    drawRow(['Periode / Lama Waktu', 'Peminjaman'], periodStr || '-', 8.5);
 
     // Row 6: Tujuan / Keperluan
     drawRow('Tujuan / Keperluan', loanInfo?.purpose || 'POC Demo', 7.5);
@@ -384,53 +402,51 @@ export const exportService = {
     drawRow('Nama Peminjam', loanInfo?.borrowerName || '-', 7.5);
 
     // Row 8: Nama Perusahaan (Highlighted)
-    drawRow('Nama Perusahaan', loanInfo?.companyName || loanInfo?.customerName || '-', 7.5, true);
+    drawRow('Nama Perusahaan', loanInfo?.companyName || loanInfo?.customerName || '-', 7.5, true, undefined, true);
 
     // Row 9: PIC Perusahaan (Highlighted)
-    drawRow('PIC Perusahaan', loanInfo?.picReceiver || loanInfo?.borrowerName || '-', 7.5, true);
+    drawRow('PIC Perusahaan', loanInfo?.picReceiver || loanInfo?.borrowerName || '-', 7.5, true, undefined, true);
 
     // Row 10: No Telp & Email (Highlighted)
     const contactParts = [loanInfo?.borrowerContact, loanInfo?.contactEmail].filter(Boolean);
     drawRow('No Telp & Email', contactParts.join('  /  ') || '-', 7.5, true);
 
     // Row 11: Keterangan (Large Box)
-    const notesHeight = 28.5;
+    const notesHeight = 24;
     doc.rect(startX, currentY, contentWidth, notesHeight);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
-    doc.text('Keterangan :', startX + 2.5, currentY + 5);
+    doc.text('Keterangan :', startX + 2.5, currentY + 4.8);
     
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    const generalNotes = loanInfo?.notes || item.notes || '';
-    if (generalNotes) {
-      doc.text(generalNotes, startX + 2.5, currentY + 10, { maxWidth: contentWidth - 5 });
-    }
+    const generalNotes = loanInfo?.notes || item.notes || '-';
+    doc.text(generalNotes, startX + 2.5, currentY + 9.5, { maxWidth: contentWidth - 5 });
     currentY += notesHeight;
 
     // --- 6. SIGNATURE SECTION ---
     currentY += 4;
     const sigBoxWidth = (contentWidth - 4) / 2; // 87mm each
-    const sigBoxHeight = 36;
+    const sigBoxHeight = 32;
     const rightSigBoxX = startX + sigBoxWidth + 4;
 
     // Left Signature: Yang Menerima
     doc.rect(startX, currentY, sigBoxWidth, sigBoxHeight);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
-    doc.text('Yang Menerima,', startX + (sigBoxWidth / 2), currentY + 6, { align: 'center' });
+    doc.text('Yang Menerima,', startX + (sigBoxWidth / 2), currentY + 5.5, { align: 'center' });
     doc.setFont('helvetica', 'normal');
     const receiverName = loanInfo?.borrowerName ? `(  ${loanInfo.borrowerName}  )` : '(                                                )';
-    doc.text(receiverName, startX + (sigBoxWidth / 2), currentY + sigBoxHeight - 4, { align: 'center' });
+    doc.text(receiverName, startX + (sigBoxWidth / 2), currentY + sigBoxHeight - 4.5, { align: 'center' });
 
     // Right Signature: Yang Menyerahkan
     doc.rect(rightSigBoxX, currentY, sigBoxWidth, sigBoxHeight);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
-    doc.text('Yang Menyerahkan,', rightSigBoxX + (sigBoxWidth / 2), currentY + 6, { align: 'center' });
+    doc.text('Yang Menyerahkan,', rightSigBoxX + (sigBoxWidth / 2), currentY + 5.5, { align: 'center' });
     doc.setFont('helvetica', 'normal');
-    const handedByName = (loanInfo?.handedOverBy || loanInfo?.loanedBy) ? `(  ${loanInfo?.handedOverBy || loanInfo?.loanedBy}  )` : '(                                                )';
-    doc.text(handedByName, rightSigBoxX + (sigBoxWidth / 2), currentY + sigBoxHeight - 4, { align: 'center' });
+    const handedByName = (loanInfo?.handedOverBy || loanInfo?.loanedBy || settings?.picName) ? `(  ${loanInfo?.handedOverBy || loanInfo?.loanedBy || settings?.picName}  )` : '(                                                )';
+    doc.text(handedByName, rightSigBoxX + (sigBoxWidth / 2), currentY + sigBoxHeight - 4.5, { align: 'center' });
 
     const fileName = `Surat_Peminjaman_Demo_${documentNumber.replace(/[\s/\\:]+/g, '_')}.pdf`;
 
