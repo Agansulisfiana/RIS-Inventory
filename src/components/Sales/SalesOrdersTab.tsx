@@ -408,86 +408,217 @@ export const SalesOrdersTab: React.FC<SalesOrdersTabProps> = ({
   };
 
   const handlePrintDeliveryOrder = (order: SalesOrder) => {
-    const rows = order.items.map((item) => {
+    const formattedDate = new Date(order.orderDate).toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    const rows = order.items.map((item, index) => {
       const snList = (item.serialNumbers && item.serialNumbers.length > 0)
         ? item.serialNumbers
-        : (item.serialNumber ? [item.serialNumber] : []);
+        : (item.serialNumber && item.serialNumber !== '-' ? [item.serialNumber] : []);
+      
       const snText = snList.length > 0
-        ? `<div style="font-size: 10px; font-family: monospace; color: #4338ca; margin-top: 3px;">
+        ? `<div style="font-size: 9px; font-family: 'JetBrains Mono', monospace; color: #3730a3; margin-top: 3px; background: #eef2ff; padding: 1.5px 5px; border-radius: 4px; display: inline-block; border: 1px solid #c7d2fe;">
              <strong>S/N:</strong> ${snList.join(', ')}
            </div>`
         : '';
 
       return `
-        <tr>
-          <td>
-            <div style="font-weight: 700; color: #0f172a;">${item.name}</div>
-            <div style="font-size: 10px; color: #64748b;">SKU: ${item.sku}</div>
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="text-align: center; font-weight: 700; color: #64748b; font-size: 10px; padding: 6px 6px;">${index + 1}</td>
+          <td style="padding: 6px 8px;">
+            <div style="font-weight: 700; color: #0f172a; font-size: 11.5px; line-height: 1.3;">${item.name}</div>
+            <div style="font-size: 9.5px; font-family: 'JetBrains Mono', monospace; color: #64748b; margin-top: 1px;">SKU: ${item.sku}</div>
             ${snText}
           </td>
-          <td style="text-align:center; font-weight: 700;">${item.quantity}</td>
-          <td style="text-align:right;">${formatCurrency(item.unitPrice)}</td>
-          <td style="text-align:right; font-weight:700; color:#047857;">${formatCurrency(item.totalPrice)}</td>
+          <td style="text-align: center; font-weight: 800; color: #0f172a; font-size: 11.5px; padding: 6px 6px;">${item.quantity}</td>
+          <td style="text-align: right; font-family: 'JetBrains Mono', monospace; color: #334155; font-size: 11px; padding: 6px 8px;">${formatCurrency(item.unitPrice)}</td>
+          <td style="text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 800; color: #0f172a; font-size: 11.5px; padding: 6px 8px;">${formatCurrency(item.totalPrice)}</td>
         </tr>
       `;
     }).join('');
 
     const html = `
-      <div class="doc" style="font-family: 'Segoe UI', 'Inter', Arial, sans-serif;">
-        <div class="meta" style="font-family: 'Segoe UI', 'Inter', Arial, sans-serif;">
-          <div>
-            <div class="brand" style="font-size: 17px; font-weight: 800; letter-spacing: -0.03em; color: #0f172a;">${settings.companyName}</div>
-            <div class="muted" style="font-size: 11px; line-height: 1.5;">${settings.address}</div>
-            <div class="muted" style="font-size: 11px; line-height: 1.5;">Telp: ${settings.phone}</div>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+      
+      <div class="doc" style="font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; padding: 14px 18px; max-width: 780px; margin: 0 auto;">
+        
+        <!-- HEADER PERUSAHAAN & JUDUL DOKUMEN -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 12px; gap: 16px;">
+          <div style="flex: 1;">
+            <div style="font-size: 16px; font-weight: 900; letter-spacing: -0.02em; color: #0f172a; text-transform: uppercase;">
+              ${settings.companyName || 'PT. REYCOM INTEGRATED SOLUSI'}
+            </div>
+            <div style="font-size: 10px; color: #475569; line-height: 1.45; margin-top: 2px; max-width: 420px;">
+              ${settings.address || 'Kawasan Niaga & Industri Pulogadung Blok B No. 12, Jakarta Timur'}
+            </div>
+            <div style="font-size: 10px; color: #475569; line-height: 1.45; margin-top: 1px;">
+              <strong>Telp:</strong> ${settings.phone || '(021) 4682-9900 / 0812-3456-7890'}
+            </div>
           </div>
-          <div style="text-align:right;">
-            <div style="font-size: 14px; color: #1d4ed8; font-weight: 900; letter-spacing: 0.04em;">${order.orderNumber}</div>
-            <div class="muted" style="font-size: 11px;">Tanggal: ${new Date(order.orderDate).toLocaleDateString('id-ID')}</div>
-            <div class="muted" style="font-size: 11px;">Sales PIC: ${order.salesPic}</div>
+
+          <div style="text-align: right; min-width: 190px;">
+            <div style="display: inline-block; background: #0f172a; color: #ffffff; font-size: 8.5px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; margin-bottom: 3px;">
+              DOKUMEN PENGIRIMAN
+            </div>
+            <div style="font-size: 16px; font-weight: 900; letter-spacing: -0.01em; color: #0f172a; text-transform: uppercase;">
+              SURAT JALAN (DO)
+            </div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 800; color: #2563eb; margin-top: 1px;">
+              ${order.orderNumber}
+            </div>
+            <div style="font-size: 10px; color: #64748b; margin-top: 1px;">
+              Tanggal: <strong style="color: #334155;">${formattedDate}</strong>
+            </div>
+            <div style="font-size: 10px; color: #64748b; margin-top: 1px;">
+              Sales PIC: <strong style="color: #334155;">${order.salesPic || '-'}</strong>
+            </div>
           </div>
         </div>
 
-        <div style="margin-bottom: 14px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-          <div style="font-size: 9px; letter-spacing: 0.12em; color: #64748b; text-transform: uppercase; font-weight: 700;">Tujuan Pengiriman / Customer</div>
-          <div style="font-size: 14px; font-weight: 800; margin-top: 4px; color: #111827;">${order.customerName}</div>
-          <div class="muted" style="font-size: 11px; line-height: 1.6;">${order.customerAddress || '-'}</div>
-          <div class="muted" style="font-size: 11px; line-height: 1.6;">Kontak: ${order.customerPhone || '-'}</div>
+        <!-- TUJUAN PENGIRIMAN / PENERIMA (CONSIGNEE) -->
+        <div style="margin-bottom: 12px; background: #f8fafc; padding: 10px 14px; border-radius: 6px; border: 1px solid #cbd5e1; display: flex; justify-content: space-between; gap: 16px;">
+          <div style="flex: 1;">
+            <div style="font-size: 9px; letter-spacing: 0.08em; color: #64748b; text-transform: uppercase; font-weight: 800;">
+              Tujuan Pengiriman / Penerima (Consignee):
+            </div>
+            <div style="font-size: 13.5px; font-weight: 900; margin-top: 2px; color: #0f172a;">
+              ${order.customerName}
+            </div>
+            <div style="font-size: 10.5px; color: #334155; line-height: 1.45; margin-top: 1px;">
+              ${order.customerAddress || '-'}
+            </div>
+            <div style="font-size: 10.5px; color: #475569; line-height: 1.45; margin-top: 1px;">
+              <strong>Kontak / No. Telp:</strong> ${order.customerPhone || '-'}
+            </div>
+          </div>
+          <div style="min-width: 150px; border-left: 1px dashed #cbd5e1; padding-left: 14px; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-size: 9px; letter-spacing: 0.06em; color: #64748b; text-transform: uppercase; font-weight: 800;">Status DO:</div>
+            <div style="font-size: 11px; font-weight: 800; color: #059669; margin-top: 1px;">${order.deliveryStatus || 'Terkirim'}</div>
+            <div style="font-size: 9px; letter-spacing: 0.06em; color: #64748b; text-transform: uppercase; font-weight: 800; margin-top: 4px;">Status Pembayaran:</div>
+            <div style="font-size: 11px; font-weight: 800; color: #2563eb; margin-top: 1px;">${order.paymentStatus || 'Lunas'}</div>
+          </div>
         </div>
 
-        <table>
+        <!-- TABEL PRODUK & SERIAL NUMBER -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
           <thead>
-            <tr>
-              <th>Produk & Serial Number</th>
-              <th style="text-align:center;">Qty</th>
-              <th style="text-align:right;">Harga Satuan</th>
-              <th style="text-align:right;">Total</th>
+            <tr style="background: #0f172a; color: #ffffff;">
+              <th style="width: 32px; text-align: center; padding: 6px 4px; font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;">No.</th>
+              <th style="padding: 6px 8px; font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;">Nama Produk & Serial Number</th>
+              <th style="width: 50px; text-align: center; padding: 6px 4px; font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;">Qty</th>
+              <th style="width: 110px; text-align: right; padding: 6px 8px; font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;">Harga Satuan</th>
+              <th style="width: 120px; text-align: right; padding: 6px 8px; font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;">Total Harga</th>
             </tr>
           </thead>
-          <tbody>${rows}</tbody>
+          <tbody>
+            ${rows}
+          </tbody>
         </table>
 
-        <div class="total-box">
-          <div class="total-row"><span>Subtotal</span><span>${formatCurrency(order.subtotal)}</span></div>
-          ${order.discount > 0 ? `<div class="total-row" style="color:#dc2626;"><span>Diskon</span><span>-${formatCurrency(order.discount)}</span></div>` : ''}
-          <div class="total-row" style="padding-top: 8px; border-top: 1px solid #e5e7eb; margin-top: 6px;"><strong>Grand Total</strong><strong style="color:#047857;">${formatCurrency(order.grandTotal)}</strong></div>
+        <!-- TOTAL HARGA & CATATAN -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-top: 6px;">
+          <div style="flex: 1;">
+            ${order.notes ? `
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 6px 10px; font-size: 10.5px; color: #334155; line-height: 1.45;">
+                <strong style="color: #0f172a;">Catatan:</strong> ${order.notes}
+              </div>
+            ` : ''}
+            <div style="margin-top: 6px; font-size: 9.5px; color: #64748b; line-height: 1.35; font-style: italic;">
+              * Harap periksa fisik & nomor seri (S/N) barang saat serah terima. Komplain wajib menyertakan Surat Jalan asli.
+            </div>
+          </div>
+
+          <div style="width: 250px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 5px; padding: 6px 12px;">
+            <div style="display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; color: #475569;">
+              <span>Subtotal:</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700;">${formatCurrency(order.subtotal)}</span>
+            </div>
+            ${order.discount > 0 ? `
+              <div style="display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; color: #dc2626;">
+                <span>Diskon:</span>
+                <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700;">-${formatCurrency(order.discount)}</span>
+              </div>
+            ` : ''}
+            <div style="display: flex; justify-content: space-between; padding-top: 4px; margin-top: 3px; border-top: 1.5px solid #cbd5e1; font-size: 12.5px; color: #0f172a;">
+              <strong style="font-weight: 900;">Grand Total:</strong>
+              <strong style="font-family: 'JetBrains Mono', monospace; font-weight: 900; color: #047857;">${formatCurrency(order.grandTotal)}</strong>
+            </div>
+          </div>
         </div>
 
-        ${order.notes ? `<div class="note" style="font-size: 11px; line-height: 1.5; margin-top: 12px;"><strong>Catatan:</strong> ${order.notes}</div>` : ''}
+        <!-- SECTION TANDA TANGAN (TTD 3 KOLOM PROPORSIONAL & TIDAK TUMPAH KE HALAMAN 2) -->
+        <div style="margin-top: 18px; padding-top: 10px; border-top: 1px solid #cbd5e1; page-break-inside: avoid;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+            
+            <!-- Kolom 1: Yang Menyerahkan / Gudang -->
+            <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 8px; background: #ffffff;">
+              <div style="font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #0f172a;">
+                YANG MENYERAHKAN
+              </div>
+              <div style="font-size: 8.5px; color: #64748b; margin-top: 1px;">
+                Bagian Gudang & Logistik
+              </div>
+              <div style="height: 48px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 2px;">
+                <span style="font-size: 8px; color: #94a3b8; font-style: italic;">(Tanda Tangan & Cap)</span>
+              </div>
+              <div style="border-top: 1.5px solid #0f172a; padding-top: 3px; font-weight: 800; color: #0f172a; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${settings.companyName || 'PT. Reycom Integrated Solusi'}
+              </div>
+              <div style="font-size: 9px; color: #64748b; margin-top: 1px;">
+                Tgl: _____ / _____ / 20___
+              </div>
+            </div>
 
-        <div style="display:flex; justify-content:space-between; gap:20px; margin-top: 26px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
-          <div style="flex:1; text-align:center; color:#475569;">
-            <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 24px;">Yang Menyerahkan / Gudang</div>
-            <div style="border-top:1px solid #cbd5e1; display:inline-block; min-width: 160px; padding-top: 8px; font-weight: 700; color: #0f172a; font-size: 11px;">${settings.companyName}</div>
-          </div>
-          <div style="flex:1; text-align:center; color:#475569;">
-            <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 24px;">Penerima / Customer</div>
-            <div style="border-top:1px solid #cbd5e1; display:inline-block; min-width: 160px; padding-top: 8px; font-weight: 700; color: #0f172a; font-size: 11px;">${order.customerName}</div>
+            <!-- Kolom 2: Yang Membawa / Ekspedisi / Driver -->
+            <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 8px; background: #ffffff;">
+              <div style="font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #0f172a;">
+                PENGEMUDI / KURIR
+              </div>
+              <div style="font-size: 8.5px; color: #64748b; margin-top: 1px;">
+                Ekspedisi / Pengantar
+              </div>
+              <div style="height: 48px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 2px;">
+                <span style="font-size: 8px; color: #94a3b8; font-style: italic;">(Tanda Tangan Driver)</span>
+              </div>
+              <div style="border-top: 1.5px solid #0f172a; padding-top: 3px; font-weight: 700; color: #0f172a; font-size: 10.5px;">
+                ( .................................................. )
+              </div>
+              <div style="font-size: 9px; color: #64748b; margin-top: 1px;">
+                No. Pol / Resi: .....................
+              </div>
+            </div>
+
+            <!-- Kolom 3: Diterima Oleh / Customer -->
+            <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 8px; background: #ffffff;">
+              <div style="font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #0f172a;">
+                PENERIMA / CUSTOMER
+              </div>
+              <div style="font-size: 8.5px; color: #64748b; margin-top: 1px;">
+                Tanda Tangan & Cap PT
+              </div>
+              <div style="height: 48px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 2px;">
+                <span style="font-size: 8px; color: #94a3b8; font-style: italic;">(Cap Stempel & TTD)</span>
+              </div>
+              <div style="border-top: 1.5px solid #0f172a; padding-top: 3px; font-weight: 800; color: #0f172a; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ( ${order.customerName} )
+              </div>
+              <div style="font-size: 9px; color: #64748b; margin-top: 1px;">
+                Tgl Terima: _____ / _____ / 20___
+              </div>
+            </div>
+
           </div>
         </div>
+
       </div>
     `;
 
-    printHtmlDocument('Surat Jalan DO', html);
+    printHtmlDocument(`Surat Jalan DO - ${order.orderNumber}`, html);
   };
 
   return (
@@ -701,152 +832,180 @@ export const SalesOrdersTab: React.FC<SalesOrdersTabProps> = ({
 
       {/* Modal Detail Order / Print Preview */}
       {selectedOrderForDetail && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600" />
-                <h3 className="font-black text-slate-900 text-base">SURAT JALAN & INVOICE PENJUALAN</h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+          <div className="bg-white w-full max-w-xl md:max-w-2xl rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[90vh] my-auto animate-in fade-in zoom-in-95 overflow-hidden">
+            
+            {/* Header (shrink-0) */}
+            <div className="p-3.5 sm:p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div className="truncate">
+                  <h3 className="font-black text-slate-900 text-sm sm:text-base leading-tight">Detail Surat Jalan (DO)</h3>
+                  <div className="flex items-center gap-2 text-[10.5px] text-slate-500 font-medium">
+                    <span className="font-mono font-bold text-blue-600">{selectedOrderForDetail.orderNumber}</span>
+                    <span>•</span>
+                    <span>{new Date(selectedOrderForDetail.orderDate).toLocaleDateString('id-ID')}</span>
+                  </div>
+                </div>
               </div>
               <button
                 onClick={() => setSelectedOrderForDetail(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg"
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4 text-xs">
-              <div className="flex justify-between items-start border-b border-slate-200 pb-4">
-                <div className="flex items-center gap-3">
-                  <RisLogo size={44} />
-                  <div>
-                    <div className="font-bold text-slate-900 text-sm">{settings.companyName}</div>
-                    <div className="text-slate-500">{settings.address}</div>
-                    <div className="text-slate-500">Telp: {settings.phone}</div>
+            {/* Scrollable Body (flex-1 overflow-y-auto) */}
+            <div className="p-3.5 sm:p-5 space-y-3 text-xs flex-1 overflow-y-auto">
+              
+              {/* Customer Info Card */}
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 flex flex-col sm:flex-row justify-between gap-2.5">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Tujuan Pengiriman / Customer:</div>
+                  <div className="font-bold text-slate-900 text-sm truncate">{selectedOrderForDetail.customerName}</div>
+                  <div className="text-slate-600 text-[11px] leading-snug">{selectedOrderForDetail.customerAddress || '-'}</div>
+                  <div className="text-slate-500 text-[11px]">Kontak: {selectedOrderForDetail.customerPhone || '-'}</div>
+                </div>
+                <div className="sm:text-right shrink-0 space-y-1">
+                  <div className="text-[10px] text-slate-500">Sales PIC: <strong className="text-slate-800">{selectedOrderForDetail.salesPic}</strong></div>
+                  <div className="flex items-center sm:justify-end gap-1.5">
+                    <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold border ${
+                      selectedOrderForDetail.paymentStatus === 'Lunas'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      {selectedOrderForDetail.paymentStatus}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold border bg-blue-50 text-blue-700 border-blue-200">
+                      {selectedOrderForDetail.deliveryStatus}
+                    </span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-mono font-black text-blue-600 text-base">{selectedOrderForDetail.orderNumber}</div>
-                  <div className="text-slate-500">Tanggal: {new Date(selectedOrderForDetail.orderDate).toLocaleDateString('id-ID')}</div>
-                  <div className="text-slate-500">Sales PIC: {selectedOrderForDetail.salesPic}</div>
+              </div>
+
+              {/* Items Table */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <div className="overflow-x-auto max-h-44 overflow-y-auto">
+                  <table className="w-full text-left text-xs min-w-[460px]">
+                    <thead className="bg-slate-100 text-slate-600 font-bold text-[10px] uppercase sticky top-0 z-10">
+                      <tr>
+                        <th className="p-2.5">Produk & Serial Number</th>
+                        <th className="p-2.5 text-center w-12">Qty</th>
+                        <th className="p-2.5 text-right w-24">Harga Satuan</th>
+                        <th className="p-2.5 text-right w-28">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {selectedOrderForDetail.items.map((item, idx) => {
+                        const snList = (item.serialNumbers && item.serialNumbers.length > 0)
+                          ? item.serialNumbers
+                          : (item.serialNumber && item.serialNumber !== '-' ? [item.serialNumber] : []);
+
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="p-2.5">
+                              <div className="font-bold text-slate-800 leading-snug">{item.name}</div>
+                              <div className="text-[10px] text-slate-400 font-mono">SKU: {item.sku}</div>
+                              {snList.length > 0 && (
+                                <div className="mt-1 flex flex-wrap items-center gap-1">
+                                  <span className="text-[8.5px] font-bold text-slate-400 uppercase">S/N:</span>
+                                  {snList.map((sn, sIdx) => (
+                                    <span key={sIdx} className="font-mono text-[9px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">
+                                      {sn}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-2.5 text-center font-bold text-slate-900">{item.quantity}</td>
+                            <td className="p-2.5 text-right font-mono text-[11px] text-slate-600">{formatCurrency(item.unitPrice)}</td>
+                            <td className="p-2.5 text-right font-mono text-[11px] font-bold text-emerald-700">{formatCurrency(item.totalPrice)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase">Tujuan Pengiriman / Customer:</div>
-                <div className="font-bold text-slate-900 text-sm mt-0.5">{selectedOrderForDetail.customerName}</div>
-                <div className="text-slate-600">{selectedOrderForDetail.customerAddress || '-'}</div>
-                <div className="text-slate-600">Kontak: {selectedOrderForDetail.customerPhone || '-'}</div>
-              </div>
+              {/* Total & Status Row */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2.5 bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Status DO:</span>
+                  <select
+                    value={selectedOrderStatus}
+                    onChange={(e) => setSelectedOrderStatus(e.target.value as SalesOrder['deliveryStatus'])}
+                    className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 sm:flex-initial"
+                  >
+                    <option value="Terkirim">Terkirim</option>
+                    <option value="Dalam Pengiriman">Dalam Pengiriman</option>
+                    <option value="Menunggu Kurir">Menunggu Kurir</option>
+                    <option value="Draft">Draft</option>
+                  </select>
+                  <button
+                    onClick={() => {
+                      onUpdateSalesOrder(selectedOrderForDetail.id, { deliveryStatus: selectedOrderStatus });
+                      setSelectedOrderForDetail({ ...selectedOrderForDetail, deliveryStatus: selectedOrderStatus });
+                    }}
+                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0"
+                  >
+                    Simpan
+                  </button>
+                </div>
 
-              <table className="w-full text-left border border-slate-200 rounded-lg overflow-hidden">
-                <thead className="bg-slate-100 text-slate-700 font-bold">
-                  <tr>
-                    <th className="p-2.5">Produk & Serial Number</th>
-                    <th className="p-2.5 text-center">Qty</th>
-                    <th className="p-2.5 text-right">Harga Satuan</th>
-                    <th className="p-2.5 text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {selectedOrderForDetail.items.map((item, idx) => {
-                    const snList = (item.serialNumbers && item.serialNumbers.length > 0)
-                      ? item.serialNumbers
-                      : (item.serialNumber && item.serialNumber !== '-' ? [item.serialNumber] : []);
-
-                    return (
-                      <tr key={idx}>
-                        <td className="p-2.5">
-                          <div className="font-bold text-slate-800">{item.name}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">SKU: {item.sku}</div>
-                          {snList.length > 0 && (
-                            <div className="mt-1 flex flex-wrap items-center gap-1">
-                              <span className="text-[9px] font-bold text-slate-500 uppercase">S/N:</span>
-                              {snList.map((sn, sIdx) => (
-                                <span key={sIdx} className="font-mono text-[9px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">
-                                  {sn}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-2.5 text-center font-bold">{item.quantity}</td>
-                        <td className="p-2.5 text-right">{formatCurrency(item.unitPrice)}</td>
-                        <td className="p-2.5 text-right font-bold text-emerald-700">{formatCurrency(item.totalPrice)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-
-              <div className="flex justify-end pt-2">
-                <div className="w-64 space-y-1 text-right">
-                  <div className="flex justify-between text-slate-500">
+                <div className="w-full sm:w-56 space-y-0.5 text-right text-xs">
+                  <div className="flex justify-between text-slate-500 text-[11px]">
                     <span>Subtotal:</span>
-                    <span>{formatCurrency(selectedOrderForDetail.subtotal)}</span>
+                    <span className="font-mono">{formatCurrency(selectedOrderForDetail.subtotal)}</span>
                   </div>
                   {selectedOrderForDetail.discount > 0 && (
-                    <div className="flex justify-between text-rose-600 font-bold">
+                    <div className="flex justify-between text-rose-600 text-[11px] font-bold">
                       <span>Diskon:</span>
-                      <span>-{formatCurrency(selectedOrderForDetail.discount)}</span>
+                      <span className="font-mono">-{formatCurrency(selectedOrderForDetail.discount)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-slate-900 font-black text-sm pt-2 border-t border-slate-200">
+                  <div className="flex justify-between text-slate-900 font-black text-xs pt-1 border-t border-slate-200">
                     <span>Grand Total:</span>
-                    <span className="text-emerald-700">{formatCurrency(selectedOrderForDetail.grandTotal)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status Pengiriman</div>
-                    <div className="text-sm font-bold text-slate-900 mt-1">{selectedOrderForDetail.deliveryStatus}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={selectedOrderStatus}
-                      onChange={(e) => setSelectedOrderStatus(e.target.value as SalesOrder['deliveryStatus'])}
-                      className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="Terkirim">Terkirim</option>
-                      <option value="Dalam Pengiriman">Dalam Pengiriman</option>
-                      <option value="Menunggu Kurir">Menunggu Kurir</option>
-                      <option value="Draft">Draft</option>
-                    </select>
-                    <button
-                      onClick={() => {
-                        onUpdateSalesOrder(selectedOrderForDetail.id, { deliveryStatus: selectedOrderStatus });
-                        setSelectedOrderForDetail({ ...selectedOrderForDetail, deliveryStatus: selectedOrderStatus });
-                      }}
-                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[11px] font-bold"
-                    >
-                      Simpan
-                    </button>
+                    <span className="font-mono text-emerald-700">{formatCurrency(selectedOrderForDetail.grandTotal)}</span>
                   </div>
                 </div>
               </div>
 
               {selectedOrderForDetail.notes && (
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-600 text-xs">
-                  <span className="font-bold text-slate-800">Catatan: </span>
+                <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-slate-600 text-xs">
+                  <strong className="text-slate-800">Catatan: </strong>
                   {selectedOrderForDetail.notes}
                 </div>
               )}
+
+              {/* Info TTD 3 Kolom Otomatis */}
+              <div className="flex items-center justify-between p-2.5 bg-blue-50/70 border border-blue-200 rounded-xl text-[11px] text-blue-900">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span className="font-medium truncate">
+                    Format TTD 3 Pihak (Gudang, Driver, & Customer) otomatis tercetak rapi di lembar DO A4.
+                  </span>
+                </div>
+                <span className="text-[9.5px] font-bold bg-white text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full shrink-0 shadow-2xs ml-2">
+                  Format Pas A4
+                </span>
+              </div>
             </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+            {/* Sticky Footer (shrink-0, selalu terlihat dan mudah diklik) */}
+            <div className="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap sm:flex-nowrap items-center justify-end gap-2 shrink-0">
               <button
                 onClick={() => setSelectedOrderForDetail(null)}
-                className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-slate-100"
+                className="w-full sm:w-auto px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-slate-100 text-xs transition-colors cursor-pointer"
               >
                 Tutup
               </button>
               <button
                 onClick={() => handlePrintDeliveryOrder(selectedOrderForDetail)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center gap-2"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
               >
                 <Printer className="w-4 h-4" />
                 <span>Cetak Surat Jalan (DO)</span>

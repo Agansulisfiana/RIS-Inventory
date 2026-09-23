@@ -102,7 +102,7 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
   const [previewAllMode, setPreviewAllMode] = useState<boolean>(false);
 
   // Target Printer & Layout Options
-  const [targetPrinter, setTargetPrinter] = useState<TargetPrinterType>('thermal_roll');
+  const [targetPrinter, setTargetPrinter] = useState<TargetPrinterType>('sheet_a4');
   const [barcodeType, setBarcodeType] = useState<StickerBarcodeType>('qr_code');
   const [stickerSize, setStickerSize] = useState<StickerSize>('50x30');
   const [textDensity, setTextDensity] = useState<TextDensity>('auto');
@@ -507,7 +507,7 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
                 break-after: page !important;
               }
             ` : `
-              /* FORMAT PRINTER A4 STANDAR (KYOCERA / LASER / INKJET) */
+              /* FORMAT PRINTER A4 STANDAR */
               @page {
                 size: A4 portrait;
                 margin: 10mm;
@@ -602,7 +602,7 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
                   <span>Target Jenis Printer:</span>
                 </label>
                 <span className="text-[10px] font-bold text-purple-700">
-                  {targetPrinter === 'thermal_roll' ? 'Zebra, TSC, Xprinter (Roll)' : 'Kyocera, HP, Canon (A4 Sheet)'}
+                  {targetPrinter === 'thermal_roll' ? 'Format Label Roll' : 'Format Lembar Kertas A4'}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -623,7 +623,7 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
                 >
                   <div className="text-[11px] font-bold">2. Printer Standar (Lembar A4)</div>
                   <div className={`text-[10px] ${targetPrinter === 'sheet_a4' ? 'text-purple-100' : 'text-slate-500'}`}>
-                    Grid berjejer di kertas A4 (Kyocera/Laser)
+                    Grid berjejer rapi di lembar kertas A4
                   </div>
                 </button>
               </div>
@@ -1010,7 +1010,7 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
         {/* Modal Footer Bottom Action */}
         <div className="p-4 sm:p-5 border-t border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
           <div className="text-xs text-slate-600">
-            Target: <strong className="text-slate-900">{targetPrinter === 'thermal_roll' ? 'Roll Thermal 50x30mm' : 'Kertas Lembar A4 (Kantor)'}</strong> | 
+            Target: <strong className="text-slate-900">{targetPrinter === 'thermal_roll' ? 'Roll Thermal 50x30mm' : 'Kertas Lembar A4'}</strong> | 
             Total: <strong className="text-purple-700">{totalStickerCount} Stiker</strong>
           </div>
           <div className="flex items-center gap-2">
