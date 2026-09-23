@@ -111,3 +111,97 @@ export const printHtmlDocument = (title: string, bodyHtml: string) => {
   iframe.addEventListener('load', printFromIframe, { once: true });
   document.body.appendChild(iframe);
 };
+
+export const printThermalStickerDocument = (
+  title: string,
+  stickerHtml: string,
+  widthMm: string,
+  heightMm: string
+) => {
+  const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${title}</title>
+  <style>
+    @page {
+      size: ${widthMm} ${heightMm};
+      margin: 0;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #000000;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .sticker-print-page {
+      width: ${widthMm};
+      height: ${heightMm};
+      page-break-after: always;
+      break-after: page;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    @media screen {
+      body {
+        background: #f1f5f9;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+      .sticker-print-page {
+        border: 1px solid #cbd5e1;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        background: #ffffff;
+      }
+    }
+  </style>
+</head>
+<body>
+  ${stickerHtml}
+</body>
+</html>`;
+
+  const printWindow = window.open('', '_blank', 'width=650,height=550,noopener,noreferrer');
+  if (printWindow) {
+    printWindow.document.open();
+    printWindow.document.write(fullHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 280);
+    return;
+  }
+
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.srcdoc = fullHtml;
+  iframe.onload = () => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    setTimeout(() => {
+      if (iframe.parentNode) {
+        iframe.parentNode.removeChild(iframe);
+      }
+    }, 1000);
+  };
+  document.body.appendChild(iframe);
+};

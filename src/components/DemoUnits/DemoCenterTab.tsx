@@ -29,7 +29,8 @@ import {
   Mail,
   FileCheck,
   List,
-  Sparkle
+  Sparkle,
+  Tag
 } from 'lucide-react';
 import { InventoryItem, User, WarehouseSettings } from '../../types';
 import { exportService } from '../../services/exportService';
@@ -38,6 +39,7 @@ import { RisLogo } from '../Common/RisLogo';
 import { formatCurrency } from '../../utils/currency';
 import { canSelectForDemo, getInventoryStockState } from '../../utils/inventoryStock';
 import { CheckoutDemoModal } from './CheckoutDemoModal';
+import { DemoStickerPrintModal } from './DemoStickerPrintModal';
 
 interface DemoCenterTabProps {
   items: InventoryItem[];
@@ -524,6 +526,14 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
     setNotes('');
   };
 
+  const [selectedItemForSticker, setSelectedItemForSticker] = useState<{ item: InventoryItem; loanInfo?: any } | null>(null);
+  const [isStickerModalOpen, setIsStickerModalOpen] = useState<boolean>(false);
+
+  const handleOpenStickerModal = (item: InventoryItem, loanInfo?: any) => {
+    setSelectedItemForSticker({ item, loanInfo: loanInfo || item.demoLoanInfo });
+    setIsStickerModalOpen(true);
+  };
+
   const handleOpenDemoReceipt = (item: InventoryItem) => {
     if (!item.demoLoanInfo) {
       alert('Belum ada data tanda terima untuk unit demo ini.');
@@ -531,14 +541,6 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
     }
     setLatestDemoReceipt({ item, info: item.demoLoanInfo });
     setIsReceiptModalOpen(true);
-  };
-
-  const handleSaveDemoReceipt = () => {
-    if (!latestDemoReceipt) return;
-    exportService.exportDemoLoanReceiptPDF(latestDemoReceipt.item, latestDemoReceipt.info, settings, {
-      autoSave: true,
-      autoPrint: false
-    });
   };
 
   const handlePrintDemoReceipt = () => {
@@ -586,6 +588,23 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
           >
             <FileText className="w-4 h-4 text-rose-600" />
             <span>PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const firstDemo = filteredItems[0] || demoItems[0] || items.find(i => i.status === 'on_demo') || items[0];
+              if (firstDemo) {
+                handleOpenStickerModal(firstDemo);
+              } else {
+                alert('Belum ada data barang untuk dibuatkan stiker demo.');
+              }
+            }}
+            className="px-3.5 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+            title="Buka Generator Label Stiker Thermal Demo Satuan"
+          >
+            <Tag className="w-4 h-4 text-purple-600" />
+            <span>Stiker Demo</span>
           </button>
 
           <button
@@ -768,6 +787,14 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
                       {/* Receipt & Check-in Actions */}
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2 flex-wrap">
+                          <button
+                            onClick={() => handleOpenStickerModal(item, item.demoLoanInfo)}
+                            className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-[10px] font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                            title="Cetak Stiker Label Thermal Unit Demo (Bisa Custom Teks)"
+                          >
+                            <Tag className="w-3.5 h-3.5 text-purple-600" />
+                            <span>Stiker Demo</span>
+                          </button>
                           <button
                             onClick={() => handleOpenDemoReceipt(item)}
                             className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-[10px] font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
@@ -1058,11 +1085,16 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
               </button>
               <button
                 type="button"
-                onClick={handleSaveDemoReceipt}
-                className="px-4 py-2 bg-indigo-700 hover:bg-indigo-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                onClick={() => {
+                  if (latestDemoReceipt) {
+                    handleOpenStickerModal(latestDemoReceipt.item, latestDemoReceipt.info);
+                  }
+                }}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                title="Buka Generator Label Stiker Thermal untuk Unit Ini"
               >
-                <FileText className="w-4 h-4" />
-                <span>Save File (PDF)</span>
+                <Tag className="w-4 h-4" />
+                <span>Cetak Stiker Demo</span>
               </button>
               <button
                 type="button"
@@ -1089,6 +1121,18 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
           setLatestDemoReceipt({ item, info });
           setIsReceiptModalOpen(true);
         }}
+      />
+
+      {/* Modal Cetak Stiker Demo Satuan (Custom Teks Bebas) */}
+      <DemoStickerPrintModal
+        isOpen={isStickerModalOpen}
+        onClose={() => {
+          setIsStickerModalOpen(false);
+          setSelectedItemForSticker(null);
+        }}
+        item={selectedItemForSticker?.item || null}
+        loanInfo={selectedItemForSticker?.loanInfo}
+        settings={settings}
       />
 
     </div>

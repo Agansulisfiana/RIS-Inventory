@@ -150,7 +150,7 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
 
         <!-- Product Name & Key Identifiers -->
         <div>
-          <div style="font-size: ${isMini ? '7pt' : isLarge ? '9.5pt' : '8pt'}; font-weight: 900; line-height: 1.15; color: #000; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+          <div style="font-size: ${item.name.length > 50 ? (isMini ? '6pt' : '7pt') : (isMini ? '7pt' : isLarge ? '9.5pt' : '8pt')}; font-weight: 900; line-height: 1.15; color: #000; word-break: break-word; overflow-wrap: break-word;">
             ${item.name}
           </div>
           <div style="display: flex; justify-content: space-between; font-size: ${isMini ? '6pt' : '6.5pt'}; color: #222; margin-top: 1px; font-family: monospace;">

@@ -39,6 +39,7 @@ import { printHtmlDocument } from '../../utils/print';
 import { storageService } from '../../services/storage';
 import { exportService } from '../../services/exportService';
 import { BarcodePrintModal } from './BarcodePrintModal';
+import { DemoStickerPrintModal } from '../DemoUnits/DemoStickerPrintModal';
 
 interface UnitDetailModalProps {
   item: InventoryItem | null;
@@ -82,6 +83,7 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
   const [transferDest, setTransferDest] = useState<string>('');
   const [transferQty, setTransferQty] = useState<number>(0);
   const [showBarcodePrintModal, setShowBarcodePrintModal] = useState(false);
+  const [showDemoStickerModal, setShowDemoStickerModal] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -145,7 +147,7 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
   const handlePrintDemoLoanReceipt = () => {
     if (!item.demoLoanInfo) return;
     try {
-      exportService.exportDemoLoanReceiptPDF(item, item.demoLoanInfo, settings, { autoSave: true, autoPrint: false });
+      exportService.exportDemoLoanReceiptPDF(item, item.demoLoanInfo, settings, { autoSave: false, autoPrint: true });
     } catch (err) {
       console.error(err);
       alert('Gagal membuat dokumen surat peminjaman demo.');
@@ -380,15 +382,28 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
                   </button>
                 </div>
 
-                {/* Fitur Cetak Stiker Barcode Satuan */}
-                <button
-                  onClick={() => setShowBarcodePrintModal(true)}
-                  className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
-                  title="Buka Generator Label Stiker Thermal Satuan (50x30mm)"
-                >
-                  <BarcodeIcon className="w-4 h-4" />
-                  <span>Cetak Stiker Barcode Satuan</span>
-                </button>
+                {/* Fitur Cetak Stiker Barcode & Demo Satuan */}
+                <div className="space-y-1.5">
+                  <button
+                    onClick={() => setShowBarcodePrintModal(true)}
+                    className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                    title="Buka Generator Label Stiker Thermal Satuan (50x30mm)"
+                  >
+                    <BarcodeIcon className="w-4 h-4" />
+                    <span>Cetak Stiker Barcode Satuan</span>
+                  </button>
+
+                  {(item.status === 'on_demo' || item.status === 'demo_loaned' || item.demoLoanInfo || item.category?.toLowerCase().includes('demo')) && (
+                    <button
+                      onClick={() => setShowDemoStickerModal(true)}
+                      className="w-full py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                      title="Buka Konfigurasi Stiker Unit Demo (Bisa Ganti Teks Bebas & Tidak Terpotong)"
+                    >
+                      <Tag className="w-4 h-4" />
+                      <span>Cetak Stiker Unit Demo (Custom Teks)</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Quick Specs Badges */}
@@ -1061,6 +1076,16 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
           item={item}
           isOpen={showBarcodePrintModal}
           onClose={() => setShowBarcodePrintModal(false)}
+          settings={settings}
+        />
+      )}
+
+      {/* Modal Cetak Stiker Demo Satuan */}
+      {showDemoStickerModal && (
+        <DemoStickerPrintModal
+          item={item}
+          isOpen={showDemoStickerModal}
+          onClose={() => setShowDemoStickerModal(false)}
           settings={settings}
         />
       )}
