@@ -18,6 +18,7 @@ import {
 import { warehouseAudio } from '../utils/audio';
 import { getPermissions } from '../utils/permissions';
 import { resolveSnTrackingType, getRegisteredSerialNumbers } from '../utils/snManagement';
+import { getInventoryStockState } from '../utils/inventoryStock';
 
 const STORAGE_KEYS = {
   USERS: 'invtrack_users_v3',
@@ -1259,17 +1260,45 @@ class StorageService {
     if (idx === -1) return false;
 
     const item = items[idx];
+    const prevQty = typeof item.quantity === 'number' ? item.quantity : 0;
+
+    // If stock is being reduced, prevent reducing more than available ready quantity
+    if (delta < 0) {
+      const stockState = getInventoryStockState(item);
+      const absDelta = Math.abs(delta);
+      if (absDelta > stockState.readyQuantity) {
+        throw new Error(`Pengurangan stok (${absDelta}) melebihi stok yang ready (${stockState.readyQuantity} ${item.unit || 'Unit'}).`);
+      }
+    }
+
+    const newQty = Math.max(0, prevQty + delta);
+    item.quantity = newQty;
+    if (newQty === 0 && item.status === 'tersedia') {
+      item.status = 'terjual';
+    } else if (item.status === 'terjual' && newQty > 0) {
+      item.status = 'tersedia';
+    }
+
     // determine warehouse to apply change
     const settings = this.getSettings();
     const targetWarehouse = warehouse || item.warehouseName || settings.warehouseName || (settings.warehouses && settings.warehouses[0]) || 'Gudang Utama Jakarta';
-    if (!item.warehouseStocks) item.warehouseStocks = {};
-    const prevWarehouseQty = Number(item.warehouseStocks[targetWarehouse] || 0);
-    const newWarehouseQty = Math.max(0, prevWarehouseQty + delta);
-    item.warehouseStocks[targetWarehouse] = newWarehouseQty;
-    // recalc total quantity
-    const newQty = Object.values(item.warehouseStocks).reduce((s, v) => s + (Number(v) || 0), 0);
-    const prevQty = item.quantity || 0;
-    item.quantity = newQty;
+    if (!item.warehouseStocks || Object.keys(item.warehouseStocks).length === 0) {
+      item.warehouseStocks = { [targetWarehouse]: newQty };
+    } else {
+      let targetKey = targetWarehouse;
+      if (item.warehouseStocks[targetKey] === undefined) {
+        const found = Object.entries(item.warehouseStocks).find(([_, q]) => Number(q || 0) >= Math.abs(delta));
+        targetKey = found ? found[0] : Object.keys(item.warehouseStocks)[0];
+      }
+      const prevWarehouseQty = Number(item.warehouseStocks[targetKey] || 0);
+      item.warehouseStocks[targetKey] = Math.max(0, prevWarehouseQty + delta);
+      // Synchronize warehouse stocks total with newQty
+      const sumWh = Object.values(item.warehouseStocks).reduce((s, v) => s + (Number(v) || 0), 0);
+      if (sumWh !== newQty) {
+        item.warehouseStocks[targetKey] = Math.max(0, Number(item.warehouseStocks[targetKey] || 0) + (newQty - sumWh));
+      }
+    }
+
     item.lastUpdated = new Date().toISOString();
     item.updatedBy = user?.name || 'Operator';
     items[idx] = item;
@@ -1382,6 +1411,20 @@ class StorageService {
 
   createSalesOrder(order: Omit<SalesOrder, 'id'>, user?: User): SalesOrder {
     try { this.ensurePermission(user, 'canCreateSales'); } catch (e) { throw e; }
+
+    // Pre-validation: ensure no sold item exceeds current ready quantity
+    const items = this.getItems();
+    for (const soldItem of order.items) {
+      const dbItem = items.find(i => i.id === soldItem.itemId);
+      if (!dbItem) {
+        throw new Error(`Produk "${soldItem.name}" tidak ditemukan di database.`);
+      }
+      const stockState = getInventoryStockState(dbItem);
+      if (soldItem.quantity > stockState.readyQuantity) {
+        throw new Error(`Checkout DO gagal: Kuantitas untuk "${soldItem.name}" (${soldItem.quantity} ${dbItem.unit || 'Unit'}) melebihi stok yang ready (${stockState.readyQuantity} ${dbItem.unit || 'Unit'}).`);
+      }
+    }
+
     const orders = this.getSalesOrders();
     const newOrder: SalesOrder = {
       ...order,
@@ -1391,18 +1434,39 @@ class StorageService {
     this.saveSalesOrders(orders);
 
     // Automatically deduct stock for each sold item and record transaction
-    const items = this.getItems();
     order.items.forEach(soldItem => {
       const idx = items.findIndex(i => i.id === soldItem.itemId);
       if (idx >= 0) {
         const item = items[idx];
-        // deduct from item-provided source warehouse or default/source warehouse
         const settings = this.getSettings();
         const sourceWarehouse = (soldItem as any).sourceWarehouse || item.warehouseName || settings.warehouseName || (settings.warehouses && settings.warehouses[0]) || 'Gudang Utama Jakarta';
-        if (!item.warehouseStocks) item.warehouseStocks = {};
-        const prevWarehouseQty = Number(item.warehouseStocks[sourceWarehouse] || 0);
-        const nextWarehouseQty = Math.max(0, prevWarehouseQty - soldItem.quantity);
-        item.warehouseStocks[sourceWarehouse] = nextWarehouseQty;
+        
+        const prevQty = typeof item.quantity === 'number' ? item.quantity : 0;
+        const newTotalQty = Math.max(0, prevQty - soldItem.quantity);
+        item.quantity = newTotalQty;
+
+        if (!item.warehouseStocks || Object.keys(item.warehouseStocks).length === 0) {
+          item.warehouseStocks = { [sourceWarehouse]: newTotalQty };
+        } else {
+          let whKey = sourceWarehouse;
+          if (item.warehouseStocks[whKey] === undefined) {
+            const foundKey = Object.entries(item.warehouseStocks).find(([_, q]) => Number(q || 0) >= soldItem.quantity);
+            whKey = foundKey ? foundKey[0] : Object.keys(item.warehouseStocks)[0];
+          }
+          const prevWh = Number(item.warehouseStocks[whKey] || 0);
+          item.warehouseStocks[whKey] = Math.max(0, prevWh - soldItem.quantity);
+
+          // Synchronize warehouseStocks total with newTotalQty
+          const currentWhSum = Object.values(item.warehouseStocks).reduce((s, v) => s + (Number(v) || 0), 0);
+          if (currentWhSum !== newTotalQty) {
+            item.warehouseStocks[whKey] = Math.max(0, Number(item.warehouseStocks[whKey] || 0) + (newTotalQty - currentWhSum));
+          }
+        }
+
+        if (newTotalQty === 0 && item.status === 'tersedia') {
+          item.status = 'terjual';
+        }
+
         // If specific serial numbers were selected for unique_per_unit items, remove them from available item serialNumbers
         const trackingType = resolveSnTrackingType(item);
         const soldSnList = (soldItem.serialNumbers && soldItem.serialNumbers.length > 0)
@@ -1422,9 +1486,6 @@ class StorageService {
           ? soldSnList.join(', ')
           : (soldItem.serialNumber || item.serialNumber || '-');
 
-        // update totals and metadata
-        const prevQty = item.quantity || 0;
-        item.quantity = Object.values(item.warehouseStocks).reduce((s, v) => s + (Number(v) || 0), 0);
         item.lastUpdated = new Date().toISOString();
         item.updatedBy = user?.name || order.salesPic;
         items[idx] = item;
@@ -1459,12 +1520,12 @@ class StorageService {
           status: 'Selesai',
           customer: order.customerName,
           totalPrice: soldItem.totalPrice,
-          notes: `Penjualan ${soldItem.quantity} ${item.unit || 'Unit'} via ${order.orderNumber}. SN: ${transactionSn}`
+          notes: `DO #${order.orderNumber}: Penjualan ${soldItem.quantity} ${item.unit || 'Unit'} kepada ${order.customerName}. Surat Jalan DO & Invoice diterbitkan. SN: ${transactionSn}`
         });
       }
     });
-    this.saveItems(items);
 
+    this.saveItems(items);
     try { warehouseAudio.playSuccess(); } catch {}
     return newOrder;
   }

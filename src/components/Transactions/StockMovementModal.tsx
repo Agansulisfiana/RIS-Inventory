@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Search, MapPin, Building2, Layers, PlusCircle, Info } from 'lucide-react';
 import { InventoryItem, StockTransaction, User, WarehouseSettings } from '../../types';
 import { storageService } from '../../services/storage';
+import { getInventoryStockState } from '../../utils/inventoryStock';
 
 interface StockMovementModalProps {
   isOpen: boolean;
@@ -59,6 +60,12 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
 
     if (!selectedItem || !fromLocation || !finalToLocation || quantity <= 0) {
       alert('Mohon lengkapi semua field: Unit, Dari Lokasi, Ke Lokasi, dan Jumlah.');
+      return;
+    }
+
+    const readyQty = selectedItem ? getInventoryStockState(selectedItem).readyQuantity : 0;
+    if (quantity > readyQty) {
+      alert(`Jumlah unit pergerakan (${quantity} ${selectedItem.unit}) tidak boleh melebihi stok yang ready (${readyQty} ${selectedItem.unit}).`);
       return;
     }
 
@@ -276,14 +283,26 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
 
           {/* Quantity */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Jumlah Unit <span className="text-rose-500">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Jumlah Unit <span className="text-rose-500">*</span>
+              </label>
+              {selectedItem && (
+                <span className="text-[11px] font-semibold text-slate-500">
+                  Ready: <strong className="text-blue-700">{getInventoryStockState(selectedItem).readyQuantity} {selectedItem.unit}</strong>
+                </span>
+              )}
+            </div>
             <input
               type="number"
               value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+              onChange={(e) => {
+                const maxVal = selectedItem ? getInventoryStockState(selectedItem).readyQuantity : 999999;
+                const val = parseInt(e.target.value, 10) || 1;
+                setQuantity(Math.max(1, Math.min(val, maxVal)));
+              }}
               min="1"
+              max={selectedItem ? getInventoryStockState(selectedItem).readyQuantity : undefined}
               className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

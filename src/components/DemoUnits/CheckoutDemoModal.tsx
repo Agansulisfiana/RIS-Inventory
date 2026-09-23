@@ -130,8 +130,8 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
     })
     .map(item => {
       const stock = getInventoryStockState(item);
-      const availableQty = stock.readyQuantity > 0 ? stock.readyQuantity : Math.max(0, item.quantity || 0);
-      const isReady = canSelectForDemo(item) && (item.quantity || 0) > 0;
+      const availableQty = stock.readyQuantity;
+      const isReady = canSelectForDemo(item) && availableQty > 0;
       return {
         item,
         stock,
@@ -142,7 +142,7 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
 
   const selectedOption = demoProductOptions.find(o => o.item.id === selectedDemoItemId);
   const selectedDemoItem = selectedOption?.item;
-  const maxDemoQuantity = Math.max(1, selectedOption?.availableQty ?? 1);
+  const maxDemoQuantity = selectedOption ? Math.max(0, selectedOption.availableQty) : 0;
   const remainingAvailableStock = Math.max(0, (selectedOption?.availableQty ?? 0) - demoQuantity);
 
   const selectedItemTrackingType = selectedDemoItem ? resolveSnTrackingType(selectedDemoItem) : 'unique_per_unit';
@@ -155,7 +155,18 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
     setFormError(null);
     const foundOption = demoProductOptions.find(o => o.item.id === itemId);
     const item = foundOption?.item;
-    if (!item) return;
+    if (!item) {
+      setDemoQuantity(1);
+      return;
+    }
+
+    const available = foundOption.availableQty;
+    if (available <= 0) {
+      setDemoQuantity(0);
+      setFormError(`Unit "${item.name}" saat ini tidak memiliki stok ready (stok habis atau seluruhnya sedang dipinjam).`);
+      setSerialNumbers([]);
+      return;
+    }
 
     const tracking = resolveSnTrackingType(item);
     if (tracking === 'shared_batch') {
@@ -178,9 +189,19 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
 
   // Handlers for Unit & Serial Number
   const handleUpdateQuantity = (newQty: number) => {
+    if (maxDemoQuantity <= 0) {
+      setDemoQuantity(0);
+      setFormError('Tidak ada stok ready yang tersedia untuk unit ini.');
+      return;
+    }
+
     const clampedQty = Math.max(1, Math.min(newQty, maxDemoQuantity));
     setDemoQuantity(clampedQty);
-    setFormError(null);
+    if (newQty > maxDemoQuantity) {
+      setFormError(`Kuantitas dibatasi maksimal ${maxDemoQuantity} unit sesuai stok ready.`);
+    } else {
+      setFormError(null);
+    }
 
     if (!selectedDemoItem) {
       setSerialNumbers(prev => {
@@ -391,8 +412,13 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
       setFormError('Pilih printer demo yang akan dipinjamkan.');
       return;
     }
-    if (!Number.isInteger(demoQuantity) || demoQuantity < 1 || demoQuantity > maxDemoQuantity) {
-      setFormError(`Jumlah unit demo harus antara 1 sampai ${maxDemoQuantity} unit.`);
+    const currentReadyInDb = getInventoryStockState(selectedDemoItem).readyQuantity;
+    if (currentReadyInDb <= 0) {
+      setFormError(`Unit "${selectedDemoItem.name}" tidak memiliki stok ready saat ini (seluruh unit sedang dipinjam atau stok kosong). Peminjaman tidak dapat diproses.`);
+      return;
+    }
+    if (!Number.isInteger(demoQuantity) || demoQuantity < 1 || demoQuantity > currentReadyInDb) {
+      setFormError(`Jumlah unit demo (${demoQuantity}) melebihi stok yang ready! Maksimal yang dapat dipinjam adalah ${currentReadyInDb} unit.`);
       return;
     }
     if (!expectedReturnDate) {
@@ -739,16 +765,17 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
                         </button>
                         <input
                           type="number"
-                          min={1}
+                          min={maxDemoQuantity > 0 ? 1 : 0}
                           max={maxDemoQuantity}
+                          disabled={maxDemoQuantity <= 0}
                           value={demoQuantity}
                           onChange={(e) => handleUpdateQuantity(parseInt(e.target.value, 10) || 1)}
-                          className="w-12 text-center text-xs font-black text-slate-900 outline-none border-x border-purple-100 py-1"
+                          className="w-12 text-center text-xs font-black text-slate-900 outline-none border-x border-purple-100 py-1 disabled:bg-slate-100"
                         />
                         <button
                           type="button"
                           onClick={() => handleUpdateQuantity(demoQuantity + 1)}
-                          disabled={demoQuantity >= maxDemoQuantity}
+                          disabled={maxDemoQuantity <= 0 || demoQuantity >= maxDemoQuantity}
                           className="px-2.5 py-1.5 text-purple-700 hover:bg-purple-50 disabled:opacity-30 disabled:hover:bg-white transition cursor-pointer"
                           title="Tambah 1 unit"
                         >
@@ -1444,7 +1471,8 @@ export const CheckoutDemoModal: React.FC<CheckoutDemoModalProps> = ({
               </button>
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
+                disabled={!selectedDemoItem || maxDemoQuantity <= 0 || demoQuantity <= 0 || demoQuantity > maxDemoQuantity}
+                className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
               >
                 <Check className="w-4 h-4" />
                 <span>Verifikasi & Keluarkan {demoQuantity} Unit Demo</span>

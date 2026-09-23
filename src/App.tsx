@@ -42,6 +42,7 @@ import {
 import { storageService } from './services/storage';
 import { exportService } from './services/exportService';
 import { getPermissions } from './utils/permissions';
+import { getInventoryStockState } from './utils/inventoryStock';
 import { 
   triggerSuccessConfetti, 
   triggerLogoCelebration, 
@@ -372,13 +373,29 @@ export default function App() {
       return false;
     }
 
+    const currentStock = getInventoryStockState(it);
+    const checkoutQty = Math.max(1, Number(info.quantity) || 1);
+
+    if (checkoutQty > currentStock.readyQuantity) {
+      showToast('Checkout Demo Gagal', `Kuantitas checkout (${checkoutQty} ${it.unit}) melebihi stok yang ready (${currentStock.readyQuantity} ${it.unit}).`);
+      return false;
+    }
+
     try {
+      const prevDemoQty = (it.demoLoanInfo && it.demoLoanInfo.active) ? (Number(it.demoLoanInfo.quantity) || 1) : 0;
+      const newTotalDemoQty = prevDemoQty + checkoutQty;
+      const remainingReady = Math.max(0, it.quantity - newTotalDemoQty);
+
       const updatedItem: InventoryItem = {
         ...it,
-        status: 'tersedia',
+        status: remainingReady === 0 ? 'on_demo' : 'tersedia',
         location: `Customer: ${info.customerName}`,
         pic: info.borrowerName,
-        demoLoanInfo: info,
+        demoLoanInfo: {
+          ...info,
+          quantity: newTotalDemoQty,
+          active: true
+        },
         lastUpdated: new Date().toISOString(),
         updatedBy: info.handedOverBy || currentUser?.name || 'Sales'
       };
@@ -391,7 +408,7 @@ export default function App() {
 
       storageService.addTransaction({
         transactionNumber: info.documentNumber || `DO-DEMO-${Date.now().toString().slice(-5)}`,
-        timestamp: info.loanDate,
+        timestamp: info.loanDate || new Date().toISOString(),
         type: 'Demo Out',
         itemId: it.id,
         itemSku: it.sku,
@@ -399,16 +416,18 @@ export default function App() {
         itemName: it.name,
         fromLocation: it.location,
         toLocation: `Customer: ${info.customerName}`,
-        quantity: info.quantity || 1,
+        quantity: checkoutQty,
         unit: it.unit || 'Unit',
+        previousQuantity: currentStock.readyQuantity,
+        newQuantity: remainingReady,
         pic: info.borrowerName,
         status: 'On Demo',
-        notes: `Peminjaman demo: ${info.quantity || 1} ${it.unit || 'Unit'} - ${info.purpose}${info.handedOverBy ? ` (Diserahkan oleh: ${info.handedOverBy})` : ''}`,
+        notes: `Peminjaman unit demo: ${checkoutQty} ${it.unit || 'Unit'} - ${info.purpose}${info.handedOverBy ? ` (Diserahkan oleh: ${info.handedOverBy})` : ''}`,
         customer: info.customerName
       });
 
       refreshData();
-      showToast('Checkout Demo Berhasil', `${info.quantity || 1} ${it.unit || 'Unit'} ${it.name} dipinjamkan ke ${info.customerName}. Tanda terima siap dibuat secara manual.`);
+      showToast('Checkout Demo Berhasil', `${checkoutQty} ${it.unit || 'Unit'} ${it.name} dipinjamkan ke ${info.customerName}.`);
       return true;
     } catch (error) {
       console.error('Checkout demo failed:', error);
@@ -428,12 +447,14 @@ export default function App() {
 
     try {
       const prevCustomer = it.demoLoanInfo?.customerName || it.location;
+      const returnedQty = it.demoLoanInfo?.quantity || 1;
+      const defaultWh = it.warehouseName || settings.warehouseName || 'Gudang Utama Jakarta';
 
       const updatedItem: InventoryItem = {
         ...it,
         status: 'tersedia',
         condition: condition as any,
-        location: 'Gudang Utama Jakarta - Rak A01',
+        location: `${defaultWh} - Rak A01`,
         pic: currentUser?.name || 'Admin',
         demoLoanInfo: undefined,
         notes: returnNotes ? `Pengembalian demo: ${returnNotes}` : it.notes,
@@ -452,16 +473,18 @@ export default function App() {
         serialNumber: it.serialNumber,
         itemName: it.name,
         fromLocation: prevCustomer,
-        toLocation: 'Gudang Utama Jakarta - Rak A01',
-        quantity: 1,
+        toLocation: `${defaultWh} - Rak A01`,
+        quantity: returnedQty,
         unit: it.unit || 'Unit',
+        previousQuantity: getInventoryStockState(it).readyQuantity,
+        newQuantity: it.quantity,
         pic: currentUser?.name || 'Admin',
         status: 'Selesai',
-        notes: `Pengembalian unit demo selesai (+1 ${it.unit || 'Unit'}). Kondisi: ${condition}. ${returnNotes}`
+        notes: `Pengembalian unit demo selesai (+${returnedQty} ${it.unit || 'Unit'}). Kondisi: ${condition}. ${returnNotes}`
       });
 
       refreshData();
-      showToast('Check-in Pengembalian Sukses', `Unit ${it.name} telah kembali ke Gudang Utama Jakarta.`);
+      showToast('Check-in Pengembalian Sukses', `Unit ${it.name} (${returnedQty} ${it.unit || 'Unit'}) telah kembali ke gudang.`);
     } catch (error) {
       console.error('Check-in demo failed:', error);
       showToast('Check-in Demo Gagal', 'Proses pengembalian unit demo gagal. Periksa izin akses dan data yang diisi.');

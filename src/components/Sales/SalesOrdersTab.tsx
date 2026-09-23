@@ -133,7 +133,16 @@ export const SalesOrdersTab: React.FC<SalesOrdersTabProps> = ({
     }
 
     const tracking = resolveSnTrackingType(it);
-    setAddQuantity(1);
+    const readyStock = getInventoryStockState(it).readyQuantity;
+    const inCartQty = cart.filter(c => c.itemId === it.id).reduce((s, c) => s + c.quantity, 0);
+    const maxAddable = Math.max(0, readyStock - inCartQty);
+
+    if (maxAddable <= 0) {
+      setAddQuantity(0);
+      setFormError(`Stok ready untuk produk "${it.name}" sudah habis atau semua sisa stok sudah dimasukkan ke keranjang.`);
+    } else {
+      setAddQuantity(1);
+    }
 
     if (tracking === 'unique_per_unit') {
       const avail = getAvailableItemSerialNumbers(it, items).filter(
@@ -148,19 +157,40 @@ export const SalesOrdersTab: React.FC<SalesOrdersTabProps> = ({
     }
   };
 
-  // Handle quantity adjustment
+  // Handle quantity adjustment with strict clamp to ready stock
   const handleUpdateAddQuantity = (newQty: number) => {
-    const qty = Math.max(1, newQty);
-    setAddQuantity(qty);
+    if (!currentSelectedItem) {
+      setAddQuantity(Math.max(1, newQty));
+      return;
+    }
+
+    const readyStock = getInventoryStockState(currentSelectedItem).readyQuantity;
+    const inCartQty = cart.filter(c => c.itemId === currentSelectedItem.id).reduce((s, c) => s + c.quantity, 0);
+    const maxAddable = Math.max(0, readyStock - inCartQty);
+
+    if (maxAddable <= 0) {
+      setAddQuantity(0);
+      setFormError(`Seluruh stok ready (${readyStock} ${currentSelectedItem.unit}) untuk produk ini sudah dimasukkan ke keranjang!`);
+      return;
+    }
+
+    const clampedQty = Math.max(1, Math.min(newQty, maxAddable));
+    setAddQuantity(clampedQty);
+
+    if (newQty > maxAddable) {
+      setFormError(`Kuantitas tidak bisa melebihi stok yang ready! Maksimal bisa diinput: ${maxAddable} ${currentSelectedItem.unit}.`);
+    } else {
+      setFormError(null);
+    }
 
     if (currentItemTrackingType === 'unique_per_unit' && currentSelectedItem) {
-      if (selectedSerialNumbers.length > qty) {
-        setSelectedSerialNumbers(selectedSerialNumbers.slice(0, qty));
-      } else if (selectedSerialNumbers.length < qty) {
+      if (selectedSerialNumbers.length > clampedQty) {
+        setSelectedSerialNumbers(selectedSerialNumbers.slice(0, clampedQty));
+      } else if (selectedSerialNumbers.length < clampedQty) {
         // Auto-fill remainder from selectable available SNs
         const currentSet = new Set(selectedSerialNumbers);
         const remainderCandidates = selectableAvailableSns.filter(sn => !currentSet.has(sn));
-        const needed = qty - selectedSerialNumbers.length;
+        const needed = clampedQty - selectedSerialNumbers.length;
         const additional = remainderCandidates.slice(0, needed);
         setSelectedSerialNumbers([...selectedSerialNumbers, ...additional]);
       }
@@ -224,19 +254,32 @@ export const SalesOrdersTab: React.FC<SalesOrdersTabProps> = ({
     const foundItem = items.find(i => i.id === selectedItemId);
     if (!foundItem) return;
 
+    // Strict ready stock verification
+    const stockState = getInventoryStockState(foundItem);
+    const readyStock = stockState.readyQuantity;
+    const existingInCartQty = cart.filter(c => c.itemId === selectedItemId).reduce((s, c) => s + c.quantity, 0);
+    const maxAddable = Math.max(0, readyStock - existingInCartQty);
+
+    if (maxAddable <= 0) {
+      setFormError(`Stok ready tidak mencukupi! Seluruh stok ready (${readyStock} ${foundItem.unit}) sudah ada di dalam keranjang pesanan.`);
+      return;
+    }
+
+    if (addQuantity <= 0) {
+      setFormError('Kuantitas pesanan minimal 1 unit.');
+      return;
+    }
+
+    if (addQuantity > maxAddable) {
+      setFormError(`Kuantitas pesanan (${addQuantity} ${foundItem.unit}) melebihi stok yang ready/tersedia (${maxAddable} ${foundItem.unit}). Harap sesuaikan kuantitas.`);
+      return;
+    }
+
     // choose default warehouse
     const whEntries = Object.entries(foundItem.warehouseStocks || {});
     const preferred = whEntries.find(([wh, q]) => Number(q || 0) >= addQuantity);
     const defaultWarehouse = preferred ? preferred[0] : (whEntries[0] ? whEntries[0][0] : (foundItem.warehouseName || settings.warehouseName || (settings.warehouses && settings.warehouses[0]) || 'Gudang Utama Jakarta'));
-    const availableInDefault = Number((foundItem.warehouseStocks && foundItem.warehouseStocks[defaultWarehouse]) || 0);
-
-    const totalAvailable = Object.values(foundItem.warehouseStocks || {}).reduce((s, v) => s + (Number(v) || 0), 0);
-    const existingInCartQty = cart.filter(c => c.itemId === selectedItemId).reduce((s, c) => s + c.quantity, 0);
-
-    if (existingInCartQty + addQuantity > totalAvailable) {
-      setFormError(`Stok tidak mencukupi! Total stok tersedia di gudang: ${foundItem.quantity} ${foundItem.unit}. Sudah di keranjang: ${existingInCartQty} unit.`);
-      return;
-    }
+    const availableInDefault = Number((foundItem.warehouseStocks && foundItem.warehouseStocks[defaultWarehouse]) ?? readyStock);
 
     const tracking = resolveSnTrackingType(foundItem);
     let finalSns: string[] = [];
@@ -302,8 +345,18 @@ export const SalesOrdersTab: React.FC<SalesOrdersTabProps> = ({
       return;
     }
 
-    // Validate that all items in cart have compliant SNs
+    // Validate that no item in cart exceeds current ready stock in database
     for (const item of cart) {
+      const dbItem = items.find(i => i.id === item.itemId);
+      if (!dbItem) {
+        setFormError(`Produk "${item.name}" tidak ditemukan di database.`);
+        return;
+      }
+      const readyQty = getInventoryStockState(dbItem).readyQuantity;
+      if (item.quantity > readyQty) {
+        setFormError(`Checkout DO Gagal! Kuantitas produk "${item.name}" (${item.quantity} ${dbItem.unit}) melebihi stok yang ready saat ini (${readyQty} ${dbItem.unit}). Harap sesuaikan kuantitas.`);
+        return;
+      }
       if (item.snTrackingType === 'unique_per_unit') {
         if (!item.serialNumbers || item.serialNumbers.length !== item.quantity) {
           setFormError(`Serial number untuk produk "${item.name}" belum lengkap (${item.serialNumbers?.length || 0} dari ${item.quantity} unit).`);
@@ -879,43 +932,77 @@ export const SalesOrdersTab: React.FC<SalesOrdersTabProps> = ({
                   <span>Pilih Produk & Serial Number dari Stok Gudang</span>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                  <div className="flex-1 w-full">
-                    <select
-                      value={selectedItemId}
-                      onChange={(e) => handleSelectProduct(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-medium focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    >
-                      <option value="">-- Pilih Produk Ready Stock --</option>
-                      {items.filter(i => getInventoryStockState(i).readyQuantity > 0).map(item => {
-                        const st = getInventoryStockState(item);
-                        return (
-                          <option key={item.id} value={item.id}>
-                            {item.name} (Sisa Ready: {st.readyQuantity} {item.unit} | {formatCurrency(item.sellPrice || item.price)})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
+                {(() => {
+                  const itemReady = currentSelectedItem ? getInventoryStockState(currentSelectedItem).readyQuantity : 0;
+                  const itemInCart = currentSelectedItem ? cart.filter(c => c.itemId === currentSelectedItem.id).reduce((s, c) => s + c.quantity, 0) : 0;
+                  const maxAddable = Math.max(0, itemReady - itemInCart);
+                  const isCartFull = Boolean(currentSelectedItem && maxAddable <= 0);
 
-                  <div className="w-24">
-                    <input
-                      type="number"
-                      min="1"
-                      value={addQuantity}
-                      onChange={(e) => handleUpdateAddQuantity(Number(e.target.value))}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-center font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    />
-                  </div>
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        <div className="flex-1 w-full">
+                          <select
+                            value={selectedItemId}
+                            onChange={(e) => handleSelectProduct(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 font-medium focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                          >
+                            <option value="">-- Pilih Produk Ready Stock --</option>
+                            {items.filter(i => getInventoryStockState(i).readyQuantity > 0).map(item => {
+                              const st = getInventoryStockState(item);
+                              return (
+                                <option key={item.id} value={item.id}>
+                                  {item.name} (Sisa Ready: {st.readyQuantity} {item.unit} | {formatCurrency(item.sellPrice || item.price)})
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
 
-                  <button
-                    type="button"
-                    onClick={handleAddItemToCart}
-                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold cursor-pointer transition-colors shadow-xs"
-                  >
-                    + Masukkan Keranjang
-                  </button>
-                </div>
+                        <div className="w-28 relative">
+                          <input
+                            type="number"
+                            min={maxAddable > 0 ? 1 : 0}
+                            max={maxAddable}
+                            value={addQuantity}
+                            disabled={!currentSelectedItem || isCartFull}
+                            onChange={(e) => handleUpdateAddQuantity(Number(e.target.value))}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-center font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none disabled:bg-slate-100 disabled:opacity-50"
+                            placeholder="Qty"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleAddItemToCart}
+                          disabled={!currentSelectedItem || isCartFull || addQuantity <= 0 || addQuantity > maxAddable}
+                          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold cursor-pointer transition-colors shadow-xs shrink-0"
+                        >
+                          + Masukkan Keranjang
+                        </button>
+                      </div>
+
+                      {currentSelectedItem && (
+                        <div className="flex items-center justify-between text-[11px] px-1">
+                          <span className={isCartFull ? "text-rose-600 font-bold" : "text-slate-500"}>
+                            {isCartFull 
+                              ? `⚠️ Semua stok ready (${itemReady} ${currentSelectedItem.unit}) sudah ada di keranjang.` 
+                              : `Stok Ready: ${itemReady} ${currentSelectedItem.unit} • Di Keranjang: ${itemInCart} • Maks. Bisa Ditambah: ${maxAddable} ${currentSelectedItem.unit}`}
+                          </span>
+                          {!isCartFull && maxAddable > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateAddQuantity(maxAddable)}
+                              className="text-emerald-700 font-bold hover:underline cursor-pointer"
+                            >
+                              Pilih Maks ({maxAddable})
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Dynamic SN Selection Interface if item selected */}
                 {currentSelectedItem && (

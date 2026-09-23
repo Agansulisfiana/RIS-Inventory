@@ -90,6 +90,13 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
     if (e) e.preventDefault();
     if (!restockModalItem) return;
     const qty = Math.max(1, Math.floor(Number(restockQty) || 1));
+    if (restockDirection === 'out') {
+      const readyQty = getInventoryStockState(restockModalItem as any).readyQuantity;
+      if (qty > readyQty) {
+        alert(`Jumlah pengurangan (${qty} ${restockModalItem.unit}) melebihi stok yang ready (${readyQty} ${restockModalItem.unit})!`);
+        return;
+      }
+    }
     const delta = restockDirection === 'in' ? qty : -qty;
     onQuickAdjustStock(restockModalItem.id, delta, restockNotes, restockWarehouse);
     setRestockModalItem(null);
@@ -689,9 +696,16 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
 
               {/* Quantity Stepper & Preset Buttons */}
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-700">
-                  Jumlah Satuan ({restockModalItem.unit || 'Unit'})
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Jumlah Satuan ({restockModalItem.unit || 'Unit'})
+                  </label>
+                  {restockDirection === 'out' && (
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      Maksimal Keluar: <strong className="text-amber-700">{getInventoryStockState(restockModalItem as any).readyQuantity} {restockModalItem.unit}</strong>
+                    </span>
+                  )}
+                </div>
                 
                 <div className="flex items-center gap-2">
                   <button
@@ -702,19 +716,33 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
                     <Minus className="w-4 h-4" />
                   </button>
 
-                  <input
-                    type="number"
-                    min="1"
-                    value={restockQty}
-                    onChange={(e) => setRestockQty(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="flex-1 h-11 px-3 text-center text-lg font-black text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
+                  {(() => {
+                    const maxOut = restockDirection === 'out' ? getInventoryStockState(restockModalItem as any).readyQuantity : undefined;
+                    return (
+                      <input
+                        type="number"
+                        min="1"
+                        max={maxOut}
+                        value={restockQty}
+                        onChange={(e) => {
+                          const val = Math.max(1, parseInt(e.target.value) || 1);
+                          setRestockQty(maxOut !== undefined ? Math.min(val, maxOut) : val);
+                        }}
+                        className="flex-1 h-11 px-3 text-center text-lg font-black text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    );
+                  })()}
 
                   <button
                     type="button"
-                    onClick={() => setRestockQty(restockQty + 1)}
-                    className="w-11 h-11 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                    onClick={() => {
+                      const maxOut = restockDirection === 'out' ? getInventoryStockState(restockModalItem as any).readyQuantity : undefined;
+                      if (maxOut !== undefined && restockQty >= maxOut) return;
+                      setRestockQty(restockQty + 1);
+                    }}
+                    disabled={restockDirection === 'out' && restockQty >= getInventoryStockState(restockModalItem as any).readyQuantity}
+                    className="w-11 h-11 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-slate-700 rounded-xl font-bold flex items-center justify-center transition-colors cursor-pointer shrink-0"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -723,20 +751,25 @@ export const ProductCatalogTab: React.FC<ProductCatalogTabProps> = ({
                 {/* Quick Preset Pills */}
                 <div className="flex items-center gap-1.5 flex-wrap pt-1">
                   <span className="text-[11px] font-bold text-slate-400 mr-1">Preset Cepat:</span>
-                  {[1, 5, 10, 20, 50, 100].map((num) => (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => setRestockQty(num)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
-                        restockQty === num
-                          ? 'bg-slate-900 text-white border-slate-900'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      {num} {restockModalItem.unit}
-                    </button>
-                  ))}
+                  {[1, 5, 10, 20, 50, 100].map((num) => {
+                    const maxOut = restockDirection === 'out' ? getInventoryStockState(restockModalItem as any).readyQuantity : undefined;
+                    const isDisabled = maxOut !== undefined && num > maxOut;
+                    return (
+                      <button
+                        key={num}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => setRestockQty(num)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
+                          restockQty === num
+                            ? 'bg-slate-900 text-white border-slate-900'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        {num} {restockModalItem.unit}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

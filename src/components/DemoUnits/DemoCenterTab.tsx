@@ -126,13 +126,12 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
     return exp < today;
   });
 
-  // Keep every SKU visible in the checkout list. Products remain selectable
-  // as long as their stock is available (quantity > 0). Products with 0 stock
-  // or in service/repair cannot be selected for a new loan.
+  // Keep every SKU visible in the checkout list. Products can only be selected
+  // if they have ready stock available (readyQuantity > 0).
   const demoProductOptions = items.map(item => {
     const stock = getInventoryStockState(item);
-    const availableQty = stock.readyQuantity > 0 ? stock.readyQuantity : Math.max(0, item.quantity);
-    const isReady = canSelectForDemo(item) && item.quantity > 0;
+    const availableQty = stock.readyQuantity;
+    const isReady = canSelectForDemo(item) && availableQty > 0;
 
     return {
       item,
@@ -144,10 +143,8 @@ export const DemoCenterTab: React.FC<DemoCenterTabProps> = ({
   const availableProductsForDemo = demoProductOptions.filter(option => option.isReady);
   const selectedDemoItem = items.find(item => item.id === selectedDemoItemId);
   const maxDemoQuantity = selectedDemoItem 
-    ? (getInventoryStockState(selectedDemoItem).readyQuantity > 0 
-        ? getInventoryStockState(selectedDemoItem).readyQuantity 
-        : Math.max(1, selectedDemoItem.quantity))
-    : 1;
+    ? getInventoryStockState(selectedDemoItem).readyQuantity
+    : 0;
 
   useEffect(() => {
     if (!selectedDemoItem) {
