@@ -7,22 +7,24 @@ import {
   Barcode as BarcodeIcon, 
   RotateCcw, 
   Building2, 
-  Sparkles,
-  Sliders,
-  Check,
-  Plus,
-  Trash2,
-  Layers,
-  ChevronRight,
-  Eye,
-  FileText,
-  Monitor
+  Sparkles, 
+  Sliders, 
+  Check, 
+  Plus, 
+  Trash2, 
+  Layers, 
+  ChevronRight, 
+  Eye, 
+  FileText, 
+  Monitor,
+  MinusCircle,
+  Edit3
 } from 'lucide-react';
 import { InventoryItem, WarehouseSettings } from '../../types';
 import { generateQrCodeDataUrl, generateBarcode1DDataUrl } from '../../utils/barcode';
 import { printHtmlDocument } from '../../utils/print';
 
-export type StickerSize = '50x30' | '40x25' | '60x40' | '70x40';
+export type StickerSize = '50x30' | '40x20' | '40x25' | '60x40' | '70x40';
 export type StickerBarcodeType = 'qr_code' | 'barcode_1d' | 'combination';
 export type TextDensity = 'auto' | 'compact' | 'normal';
 export type TargetPrinterType = 'thermal_roll' | 'sheet_a4';
@@ -31,6 +33,7 @@ export interface DemoSnEntry {
   id: string;
   sn: string;
   selected: boolean;
+  isCustom?: boolean;
 }
 
 export interface DemoStickerPrintModalProps {
@@ -39,6 +42,7 @@ export interface DemoStickerPrintModalProps {
   item: InventoryItem | null;
   loanInfo?: any;
   settings: WarehouseSettings;
+  allItems?: InventoryItem[];
 }
 
 /**
@@ -101,10 +105,10 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
   const [copiesPerSn, setCopiesPerSn] = useState<number>(1);
   const [previewAllMode, setPreviewAllMode] = useState<boolean>(false);
 
-  // Target Printer & Layout Options
-  const [targetPrinter, setTargetPrinter] = useState<TargetPrinterType>('sheet_a4');
+  // Target Printer & Layout Options - Default: Thermal Roll Ukuran 80mm & Ukuran 40x20 2-Line
+  const [targetPrinter, setTargetPrinter] = useState<TargetPrinterType>('thermal_roll');
   const [barcodeType, setBarcodeType] = useState<StickerBarcodeType>('qr_code');
-  const [stickerSize, setStickerSize] = useState<StickerSize>('50x30');
+  const [stickerSize, setStickerSize] = useState<StickerSize>('40x20');
   const [textDensity, setTextDensity] = useState<TextDensity>('auto');
   const [showBorder, setShowBorder] = useState<boolean>(true);
 
@@ -201,8 +205,8 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
         
         // 1D Barcode
         newB1dMap[entry.id] = generateBarcode1DDataUrl(valToEncode, {
-          width: stickerSize === '40x25' ? 1.4 : 1.8,
-          height: stickerSize === '40x25' ? 24 : 32,
+          width: (stickerSize === '40x20' || stickerSize === '40x25') ? 1.3 : 1.8,
+          height: (stickerSize === '40x20' || stickerSize === '40x25') ? 18 : 32,
           displayValue: false
         });
 
@@ -259,15 +263,17 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
   // Dimensions Preset
   const getSizeConfig = () => {
     switch (stickerSize) {
+      case '40x20':
       case '40x25':
         return {
-          label: '40 x 25 mm',
-          desc: 'Kompak / Mini (Unit kecil / aksesoris)',
+          label: '40 x 20 mm (2 Line)',
+          desc: 'Roll 80mm: 2 Kolom Sejajar (Twin Line)',
           widthMm: '40mm',
-          heightMm: '25mm',
-          previewWidthPx: 300,
-          previewHeightPx: 188,
-          qrSizeMm: '9.5mm',
+          heightMm: '20mm',
+          previewWidthPx: 270,
+          previewHeightPx: 135,
+          qrSizeMm: '7.5mm',
+          isTwoLine: true,
         };
       case '60x40':
         return {
@@ -278,6 +284,7 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
           previewWidthPx: 380,
           previewHeightPx: 253,
           qrSizeMm: '14mm',
+          isTwoLine: false,
         };
       case '70x40':
         return {
@@ -288,17 +295,19 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
           previewWidthPx: 420,
           previewHeightPx: 240,
           qrSizeMm: '14.5mm',
+          isTwoLine: false,
         };
       case '50x30':
       default:
         return {
           label: '50 x 30 mm',
-          desc: 'Standar Thermal Label Satuan (Paling Populer)',
+          desc: 'Standar Thermal Label Satuan Roll 80mm',
           widthMm: '50mm',
           heightMm: '30mm',
           previewWidthPx: 340,
           previewHeightPx: 204,
           qrSizeMm: '11.5mm',
+          isTwoLine: false,
         };
     }
   };
@@ -306,34 +315,34 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
   const sizeCfg = getSizeConfig();
 
   // MICRO-TYPOGRAPHY SIZING (Khusus Label Thermal Presisi Tinggi)
-  const getMicroFontSizes = (snText: string) => {
-    const isMini = stickerSize === '40x25';
+  const getMicroFontSizes = (snText: string, isTwoLine: boolean = false) => {
+    const isMini = stickerSize === '40x20' || stickerSize === '40x25';
     const isLarge = stickerSize === '60x40' || stickerSize === '70x40';
-    const forceCompact = textDensity === 'compact';
+    const forceCompact = textDensity === 'compact' || isTwoLine || isMini;
 
-    // 1. Header: font kecil tegas (5.2pt - 6.5pt)
-    let headerPt = isMini ? 4.8 : isLarge ? 6.5 : 5.4;
-    if (headerText.length > 40 || forceCompact) headerPt -= 0.5;
+    // 1. Header: font kecil tegas (4.5pt - 6.5pt)
+    let headerPt = isMini ? 4.5 : isLarge ? 6.5 : 5.4;
+    if (headerText.length > 35 || forceCompact) headerPt -= 0.4;
 
-    // 2. Product Name: font bold jelas (7pt - 9pt)
-    let namePt = isMini ? 6.8 : isLarge ? 9.0 : 7.8;
-    if (productName.length > 30 || forceCompact) namePt -= 0.6;
-    if (productName.length > 50) namePt -= 0.8;
+    // 2. Product Name: font bold jelas (5.8pt - 9pt)
+    let namePt = isMini ? 6.0 : isLarge ? 9.0 : 7.8;
+    if (productName.length > 25 || forceCompact) namePt -= 0.5;
+    if (productName.length > 40) namePt -= 0.5;
 
-    // 3. Serial Number: monospace tegas (6.8pt - 8.2pt)
-    let snPt = isMini ? 6.2 : isLarge ? 8.2 : 7.2;
-    if (snText.length > 18 || forceCompact) snPt -= 0.6;
-    if (snText.length > 25) snPt -= 0.7;
+    // 3. Serial Number: monospace tegas (5.6pt - 8.2pt)
+    let snPt = isMini ? 5.8 : isLarge ? 8.2 : 7.2;
+    if (snText.length > 16 || forceCompact) snPt -= 0.5;
+    if (snText.length > 22) snPt -= 0.5;
 
-    // 4. SKU & Notes: font rapi (5pt - 6.2pt)
-    let smallPt = isMini ? 4.8 : isLarge ? 6.2 : 5.4;
-    if (customNotes.length > 40 || forceCompact) smallPt -= 0.5;
+    // 4. SKU & Notes: font rapi (4.4pt - 6.2pt)
+    let smallPt = isMini ? 4.4 : isLarge ? 6.2 : 5.4;
+    if (customNotes.length > 35 || forceCompact) smallPt -= 0.4;
 
     return {
-      headerPt: `${Math.max(4.2, headerPt).toFixed(1)}pt`,
-      namePt: `${Math.max(5.8, namePt).toFixed(1)}pt`,
-      snPt: `${Math.max(5.4, snPt).toFixed(1)}pt`,
-      smallPt: `${Math.max(4.5, smallPt).toFixed(1)}pt`,
+      headerPt: `${Math.max(4.0, headerPt).toFixed(1)}pt`,
+      namePt: `${Math.max(5.2, namePt).toFixed(1)}pt`,
+      snPt: `${Math.max(5.0, snPt).toFixed(1)}pt`,
+      smallPt: `${Math.max(4.0, smallPt).toFixed(1)}pt`,
     };
   };
 
@@ -341,80 +350,80 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
    * GENERATOR KONTEN STIKER INDUSTRI (HTML/CSS Presisi)
    * Menggunakan CSS fixed-height rows sehingga 100% konsisten antara preview & hasil print
    */
-  const renderStickerInnerHtml = (entry: DemoSnEntry, unitNumber: number) => {
+  const renderStickerInnerHtml = (entry: DemoSnEntry, unitNumber: number, isTwoLine: boolean = false) => {
     const snText = entry.sn || '-';
-    const fontSizes = getMicroFontSizes(snText);
+    const isMini = stickerSize === '40x20' || stickerSize === '40x25';
+    const fontSizes = getMicroFontSizes(snText, isTwoLine);
     const qrUrl = qrCodeMap[entry.id] || '';
     const b1dUrl = barcode1DMap[entry.id] || '';
-    const isMini = stickerSize === '40x25';
 
     return `
       <!-- ROW 1: HEADER BANNER & BADGE -->
-      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 0.8px solid #000; padding-bottom: 1px; margin-bottom: 1.5px; gap: 4px; overflow: hidden; line-height: 1.15;">
-        <div style="font-size: ${fontSizes.headerPt}; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 0.6px solid #000; padding-bottom: 0.5px; margin-bottom: 1px; gap: 3px; overflow: hidden; line-height: 1.1;">
+        <div style="font-size: ${fontSizes.headerPt}; font-weight: 800; text-transform: uppercase; letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">
           ${headerText || 'PROPERTY OF PT REYCOM INTEGRATED SOLUSI'}
         </div>
         ${showBadge ? `
-          <div style="font-size: ${fontSizes.headerPt}; font-weight: 900; background: #000; color: #fff; padding: 0.5px 3px; border-radius: 1.5px; white-space: nowrap; letter-spacing: 0.04em;">
-            DEMO #${unitNumber}
+          <div style="font-size: ${fontSizes.headerPt}; font-weight: 900; background: #000; color: #fff; padding: 0.5px 2px; border-radius: 1px; white-space: nowrap; letter-spacing: 0.02em;">
+            #${unitNumber}
           </div>
         ` : ''}
       </div>
 
       <!-- ROW 2: NAMA PRODUK -->
-      <div style="margin-bottom: 1.5px; overflow: hidden;">
-        <div style="font-size: ${fontSizes.namePt}; font-weight: 900; line-height: 1.15; color: #000; word-break: break-word; overflow-wrap: break-word;">
+      <div style="margin-bottom: 1px; overflow: hidden; line-height: 1.1;">
+        <div style="font-size: ${fontSizes.namePt}; font-weight: 900; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
           ${productName || item.name}
         </div>
       </div>
 
       <!-- ROW 3: KONTEN UTAMA (BARCODE/QR + DETAIL IDENTITAS) -->
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 5px; flex: 1; min-height: 0; margin-bottom: 1px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 3px; flex: 1; min-height: 0; margin-bottom: 1px; overflow: hidden;">
         ${barcodeType === 'qr_code' ? `
           <!-- Kolom QR Code -->
-          <div style="width: ${sizeCfg.qrSizeMm}; height: ${sizeCfg.qrSizeMm}; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #fff;">
+          <div style="width: ${isMini ? '7.5mm' : sizeCfg.qrSizeMm}; height: ${isMini ? '7.5mm' : sizeCfg.qrSizeMm}; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #fff;">
             ${qrUrl ? `<img src="${qrUrl}" alt="QR" style="width: 100%; height: 100%; object-fit: contain; display: block;" />` : ''}
           </div>
           <!-- Kolom Info SN & SKU -->
-          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; line-height: 1.18;">
-            <div style="font-family: 'SF Pro Mono', Monaco, Consolas, 'Courier New', monospace; font-size: ${fontSizes.snPt}; font-weight: 900; color: #000; word-break: break-all;">
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; line-height: 1.15;">
+            <div style="font-family: 'SF Pro Mono', Monaco, Consolas, 'Courier New', monospace; font-size: ${fontSizes.snPt}; font-weight: 900; color: #000; word-break: break-all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
               SN: <span style="background: #f1f5f9; padding: 0 1px;">${snText}</span>
             </div>
             ${skuCode ? `
-              <div style="font-family: 'SF Pro Mono', Monaco, Consolas, 'Courier New', monospace; font-size: ${fontSizes.smallPt}; color: #333; word-break: break-all; margin-top: 1px;">
+              <div style="font-family: 'SF Pro Mono', Monaco, Consolas, 'Courier New', monospace; font-size: ${fontSizes.smallPt}; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 0.5px;">
                 SKU: ${skuCode}
               </div>
             ` : ''}
-            <div style="font-size: ${fontSizes.smallPt}; font-weight: 700; color: #444; margin-top: 0.5px; text-transform: uppercase;">
-              UNIT DEMO / UJI COBA
+            <div style="font-size: ${fontSizes.smallPt}; font-weight: 700; color: #555; text-transform: uppercase; margin-top: 0.5px;">
+              DEMO UNIT
             </div>
           </div>
         ` : barcodeType === 'barcode_1d' ? `
           <!-- Barcode 1D Vertikal/Horisontal -->
           <div style="width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            ${b1dUrl ? `<img src="${b1dUrl}" alt="1D Barcode" style="width: 96%; max-height: ${isMini ? '20px' : '28px'}; object-fit: contain; display: block;" />` : ''}
-            <div style="font-family: 'SF Pro Mono', Monaco, Consolas, monospace; font-size: ${fontSizes.snPt}; font-weight: 900; letter-spacing: 0.06em; margin-top: 1px; word-break: break-all; text-align: center;">
+            ${b1dUrl ? `<img src="${b1dUrl}" alt="1D Barcode" style="width: 98%; max-height: ${isMini ? '15px' : '28px'}; object-fit: contain; display: block;" />` : ''}
+            <div style="font-family: 'SF Pro Mono', Monaco, Consolas, monospace; font-size: ${fontSizes.snPt}; font-weight: 900; letter-spacing: 0.04em; margin-top: 0.5px; word-break: break-all; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">
               SN: ${snText}
             </div>
           </div>
         ` : `
           <!-- Kombinasi Barcode 1D + QR -->
           <div style="flex: 1; min-width: 0;">
-            ${b1dUrl ? `<img src="${b1dUrl}" alt="1D" style="width: 100%; max-height: ${isMini ? '16px' : '22px'}; object-fit: contain; display: block;" />` : ''}
-            <div style="font-family: monospace; font-size: ${fontSizes.smallPt}; font-weight: 800; text-align: center; word-break: break-all;">
+            ${b1dUrl ? `<img src="${b1dUrl}" alt="1D" style="width: 100%; max-height: ${isMini ? '13px' : '22px'}; object-fit: contain; display: block;" />` : ''}
+            <div style="font-family: monospace; font-size: ${fontSizes.smallPt}; font-weight: 800; text-align: center; word-break: break-all; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               SN: ${snText}
             </div>
           </div>
-          <div style="width: ${sizeCfg.qrSizeMm}; height: ${sizeCfg.qrSizeMm}; flex-shrink: 0;">
+          <div style="width: ${isMini ? '7mm' : sizeCfg.qrSizeMm}; height: ${isMini ? '7mm' : sizeCfg.qrSizeMm}; flex-shrink: 0;">
             ${qrUrl ? `<img src="${qrUrl}" alt="QR" style="width: 100%; height: 100%; object-fit: contain;" />` : ''}
           </div>
         `}
       </div>
 
       <!-- ROW 4: FOOTER NOTE & DATE -->
-      <div style="border-top: 0.8px solid #000; padding-top: 1px; display: flex; justify-content: space-between; align-items: center; gap: 4px; overflow: hidden; line-height: 1.15;">
+      <div style="border-top: 0.6px solid #000; padding-top: 0.5px; display: flex; justify-content: space-between; align-items: center; gap: 3px; overflow: hidden; line-height: 1.1;">
         <div style="font-size: ${fontSizes.smallPt}; font-weight: 700; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">
-          ${customNotes || 'TIDAK UNTUK DIPERJUALBELIKAN'}
+          ${customNotes || 'TIDAK DIPERJUALBELIKAN'}
         </div>
         <div style="font-size: ${fontSizes.smallPt}; font-weight: 800; font-family: monospace; white-space: nowrap; color: #333;">
           ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}
@@ -424,16 +433,18 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
   };
 
   // Render Single Sticker Card HTML
-  const renderStickerCardHtml = (entry: DemoSnEntry, unitNumber: number) => {
-    const isMini = stickerSize === '40x25';
+  const renderStickerCardHtml = (entry: DemoSnEntry, unitNumber: number, isTwoLine: boolean = false) => {
+    const isMini = stickerSize === '40x20' || stickerSize === '40x25';
     const isLarge = stickerSize === '60x40' || stickerSize === '70x40';
+    const cardWidth = isTwoLine ? '38.5mm' : sizeCfg.widthMm;
+    const cardHeight = isTwoLine ? '19.5mm' : sizeCfg.heightMm;
 
     return `
       <div class="demo-sticker-card" style="
-        width: ${sizeCfg.widthMm};
-        height: ${sizeCfg.heightMm};
+        width: ${cardWidth};
+        height: ${cardHeight};
         box-sizing: border-box;
-        padding: ${isMini ? '1.5mm 2mm' : isLarge ? '2.5mm 3mm' : '1.8mm 2.2mm'};
+        padding: ${isMini ? '1mm 1.4mm' : isLarge ? '2.5mm 3mm' : '1.8mm 2.2mm'};
         background: #ffffff;
         color: #000000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -441,12 +452,11 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
         flex-direction: column;
         justify-content: space-between;
         overflow: hidden;
-        ${showBorder ? 'border: 1px solid #000000;' : 'border: 1px dashed #cbd5e1;'}
+        ${showBorder ? 'border: 0.8px solid #000000;' : 'border: 0.8px dashed #cbd5e1;'}
         position: relative;
-        page-break-after: always;
-        break-after: page;
+        ${isTwoLine ? 'page-break-after: avoid; break-after: avoid;' : 'page-break-after: always; break-after: page;'}
       ">
-        ${renderStickerInnerHtml(entry, unitNumber)}
+        ${renderStickerInnerHtml(entry, unitNumber, isTwoLine)}
       </div>
     `;
   };
@@ -458,16 +468,74 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
       return;
     }
 
-    let allHtml = '';
+    const itemsToPrint: Array<{ entry: DemoSnEntry; unitNumber: number }> = [];
     selectedSnEntries.forEach((entry, idx) => {
-      const stickerHtml = renderStickerCardHtml(entry, idx + 1);
       const count = Math.max(1, copiesPerSn);
       for (let c = 0; c < count; c++) {
-        allHtml += stickerHtml;
+        itemsToPrint.push({ entry, unitNumber: idx + 1 });
       }
     });
 
     const isThermal = targetPrinter === 'thermal_roll';
+    const isTwoLine = (stickerSize === '40x20' || stickerSize === '40x25') && isThermal;
+
+    let allHtml = '';
+
+    if (isThermal && isTwoLine) {
+      // PRINTER THERMAL ROLL UKURAN 80mm - DUA LINE (2 Stiker Berdampingan per Baris Roll)
+      for (let i = 0; i < itemsToPrint.length; i += 2) {
+        const item1 = itemsToPrint[i];
+        const item2 = itemsToPrint[i + 1];
+        const sticker1Html = renderStickerCardHtml(item1.entry, item1.unitNumber, true);
+        const sticker2Html = item2
+          ? renderStickerCardHtml(item2.entry, item2.unitNumber, true)
+          : '<div style="width: 38.5mm; height: 19.5mm; visibility: hidden;"></div>';
+
+        allHtml += `
+          <div class="thermal-row-80mm" style="
+            width: 80mm;
+            height: 20mm;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            padding: 0 1mm;
+            page-break-after: always;
+            break-after: page;
+            overflow: hidden;
+          ">
+            ${sticker1Html}
+            ${sticker2Html}
+          </div>
+        `;
+      }
+    } else if (isThermal) {
+      // PRINTER THERMAL ROLL UKURAN 80mm - SATU LINE (Centered di Roll 80mm)
+      for (let i = 0; i < itemsToPrint.length; i++) {
+        const item = itemsToPrint[i];
+        const stickerHtml = renderStickerCardHtml(item.entry, item.unitNumber, false);
+        allHtml += `
+          <div class="thermal-row-80mm" style="
+            width: 80mm;
+            height: ${sizeCfg.heightMm};
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+            page-break-after: always;
+            break-after: page;
+            overflow: hidden;
+          ">
+            ${stickerHtml}
+          </div>
+        `;
+      }
+    } else {
+      // FORMAT PRINTER A4 STANDAR
+      itemsToPrint.forEach(item => {
+        allHtml += renderStickerCardHtml(item.entry, item.unitNumber, false);
+      });
+    }
 
     const fullHtml = `
       <!DOCTYPE html>
@@ -489,22 +557,23 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
             }
 
             ${isThermal ? `
-              /* FORMAT PRINTER THERMAL ROLL: 1 Stiker = 1 Page Roll */
+              /* FORMAT PRINTER THERMAL ROLL UKURAN 80MM */
               @page {
-                size: ${sizeCfg.widthMm} ${sizeCfg.heightMm};
+                size: 80mm ${sizeCfg.heightMm};
                 margin: 0;
               }
               body {
+                width: 80mm;
                 margin: 0;
                 padding: 0;
               }
-              .demo-sticker-card {
-                width: ${sizeCfg.widthMm} !important;
-                height: ${sizeCfg.heightMm} !important;
+              .thermal-row-80mm {
                 margin: 0 !important;
-                border: ${showBorder ? '1px solid #000000' : 'none'} !important;
                 page-break-after: always !important;
                 break-after: page !important;
+              }
+              .demo-sticker-card {
+                margin: 0 !important;
               }
             ` : `
               /* FORMAT PRINTER A4 STANDAR */
@@ -537,6 +606,12 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
                 flex-direction: column;
                 align-items: center;
                 gap: 15px;
+              }
+              .thermal-row-80mm {
+                background: #fff;
+                border: 1px dashed #94a3b8 !important;
+                margin-bottom: 10px !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
               }
               .demo-sticker-card {
                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -602,28 +677,33 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
                   <span>Target Jenis Printer:</span>
                 </label>
                 <span className="text-[10px] font-bold text-purple-700">
-                  {targetPrinter === 'thermal_roll' ? 'Format Label Roll' : 'Format Lembar Kertas A4'}
+                  {targetPrinter === 'thermal_roll' ? 'Printer Thermal Roll (Ukuran 80)' : 'Format Lembar Kertas A4'}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setTargetPrinter('thermal_roll')}
-                  className={`p-2 rounded-lg text-left border transition-all cursor-pointer ${targetPrinter === 'thermal_roll' ? 'bg-purple-600 text-white border-purple-600 shadow-xs' : 'bg-white text-slate-700 border-purple-200 hover:bg-purple-100/50'}`}
+                  className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${targetPrinter === 'thermal_roll' ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-1 ring-purple-600/30' : 'bg-white text-slate-700 border-purple-200 hover:bg-purple-100/50'}`}
                 >
-                  <div className="text-[11px] font-bold">1. Printer Thermal Label (Roll)</div>
-                  <div className={`text-[10px] ${targetPrinter === 'thermal_roll' ? 'text-purple-100' : 'text-slate-500'}`}>
-                    1 stiker per lembar roll (50x30mm)
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] font-bold">1. Printer Thermal Label (Roll 80)</div>
+                    <span className={`text-[9px] font-black px-1.5 py-0.2 rounded ${targetPrinter === 'thermal_roll' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'}`}>
+                      Ukuran 80
+                    </span>
+                  </div>
+                  <div className={`text-[10px] mt-0.5 ${targetPrinter === 'thermal_roll' ? 'text-purple-100' : 'text-slate-500'}`}>
+                    Lebar Roll 80mm (Format 40x20 2-Line & 50x30)
                   </div>
                 </button>
                 <button
                   type="button"
                   onClick={() => setTargetPrinter('sheet_a4')}
-                  className={`p-2 rounded-lg text-left border transition-all cursor-pointer ${targetPrinter === 'sheet_a4' ? 'bg-purple-600 text-white border-purple-600 shadow-xs' : 'bg-white text-slate-700 border-purple-200 hover:bg-purple-100/50'}`}
+                  className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${targetPrinter === 'sheet_a4' ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-1 ring-purple-600/30' : 'bg-white text-slate-700 border-purple-200 hover:bg-purple-100/50'}`}
                 >
                   <div className="text-[11px] font-bold">2. Printer Standar (Lembar A4)</div>
-                  <div className={`text-[10px] ${targetPrinter === 'sheet_a4' ? 'text-purple-100' : 'text-slate-500'}`}>
-                    Grid berjejer rapi di lembar kertas A4
+                  <div className={`text-[10px] mt-0.5 ${targetPrinter === 'sheet_a4' ? 'text-purple-100' : 'text-slate-500'}`}>
+                    Grid berjejer rapi di kertas HVS / Stiker A4
                   </div>
                 </button>
               </div>
@@ -872,8 +952,8 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
                   onChange={(e) => setStickerSize(e.target.value as StickerSize)}
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-2xs cursor-pointer"
                 >
-                  <option value="50x30">50 x 30 mm (Standar Unit Demo)</option>
-                  <option value="40x25">40 x 25 mm (Kompak / Mini)</option>
+                  <option value="40x20">40 x 20 mm (2 Line / Roll 80mm)</option>
+                  <option value="50x30">50 x 30 mm (Standar Satuan Roll 80mm)</option>
                   <option value="60x40">60 x 40 mm (Ukuran Sedang / Lega)</option>
                   <option value="70x40">70 x 40 mm (Kardus / Box Luar)</option>
                 </select>
@@ -943,54 +1023,160 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
                   <p className="text-[11px] mt-1">Centang minimal 1 unit di sebelah kiri.</p>
                 </div>
               ) : previewAllMode ? (
-                <div className="space-y-3 w-full flex flex-col items-center">
-                  {selectedSnEntries.map((entry, idx) => (
-                    <div key={entry.id} className="flex flex-col items-center">
-                      <div className="text-[10px] font-bold text-slate-600 mb-1 flex items-center gap-1">
-                        <span className="bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-mono">Stiker #{idx + 1}</span>
-                        <span>SN: {entry.sn || '-'}</span>
+                sizeCfg.isTwoLine && targetPrinter === 'thermal_roll' ? (
+                  /* 2-LINE ROLL 80MM PREVIEW (ALL) */
+                  <div className="space-y-3 w-full flex flex-col items-center">
+                    {Array.from({ length: Math.ceil(selectedSnEntries.length / 2) }).map((_, rowIdx) => {
+                      const entry1 = selectedSnEntries[rowIdx * 2];
+                      const entry2 = selectedSnEntries[rowIdx * 2 + 1];
+                      return (
+                        <div key={rowIdx} className="flex flex-col items-center w-full">
+                          <div className="text-[10px] font-bold text-slate-600 mb-1 flex items-center gap-1">
+                            <span className="bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-mono">
+                              Baris Roll #{rowIdx + 1} (2 Line Sejajar)
+                            </span>
+                          </div>
+                          <div className="bg-white p-1.5 rounded-md border-2 border-dashed border-purple-400 shadow-xs flex items-center justify-between gap-2 max-w-full overflow-x-auto">
+                            <div
+                              style={{
+                                width: '180px',
+                                height: '90px',
+                                padding: '4px 6px',
+                                border: showBorder ? '1px solid #000' : '1px dashed #cbd5e1',
+                                backgroundColor: '#ffffff',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                boxSizing: 'border-box'
+                              }}
+                              dangerouslySetInnerHTML={{ __html: renderStickerInnerHtml(entry1, rowIdx * 2 + 1, true) }}
+                            />
+                            {entry2 ? (
+                              <div
+                                style={{
+                                  width: '180px',
+                                  height: '90px',
+                                  padding: '4px 6px',
+                                  border: showBorder ? '1px solid #000' : '1px dashed #cbd5e1',
+                                  backgroundColor: '#ffffff',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'space-between',
+                                  boxSizing: 'border-box'
+                                }}
+                                dangerouslySetInnerHTML={{ __html: renderStickerInnerHtml(entry2, rowIdx * 2 + 2, true) }}
+                              />
+                            ) : (
+                              <div 
+                                style={{ width: '180px', height: '90px' }} 
+                                className="border border-dashed border-slate-300 rounded bg-slate-50 flex items-center justify-center text-[10px] text-slate-400 italic"
+                              >
+                                (Kosong)
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-3 w-full flex flex-col items-center">
+                    {selectedSnEntries.map((entry, idx) => (
+                      <div key={entry.id} className="flex flex-col items-center">
+                        <div className="text-[10px] font-bold text-slate-600 mb-1 flex items-center gap-1">
+                          <span className="bg-purple-100 text-purple-900 px-1.5 py-0.5 rounded font-mono">Stiker #{idx + 1}</span>
+                          <span>SN: {entry.sn || '-'}</span>
+                        </div>
+                        <div 
+                          style={{
+                            width: `${sizeCfg.previewWidthPx}px`,
+                            height: `${sizeCfg.previewHeightPx}px`,
+                            padding: '6px 8px',
+                            border: showBorder ? '1.5px solid #000' : '1px dashed #cbd5e1',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                            backgroundColor: '#ffffff',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            boxSizing: 'border-box'
+                          }}
+                          dangerouslySetInnerHTML={{ __html: renderStickerInnerHtml(entry, idx + 1, false) }}
+                        />
                       </div>
-                      <div 
+                    ))}
+                  </div>
+                )
+              ) : activeSnEntry ? (
+                /* SINGLE PREVIEW */
+                sizeCfg.isTwoLine && targetPrinter === 'thermal_roll' ? (
+                  <div className="flex flex-col items-center">
+                    <div className="text-[10px] font-bold text-purple-800 bg-purple-100 px-2.5 py-0.5 rounded-full mb-2">
+                      Simulasi 2 Baris Sejajar pada Roll 80mm
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border-2 border-dashed border-purple-400 shadow-sm flex items-center justify-center gap-2">
+                      <div
                         style={{
-                          width: `${sizeCfg.previewWidthPx}px`,
-                          height: `${sizeCfg.previewHeightPx}px`,
-                          padding: '8px 10px',
-                          border: showBorder ? '1.5px solid #000' : '1px dashed #cbd5e1',
-                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                          width: '185px',
+                          height: '92px',
+                          padding: '4px 6px',
+                          border: showBorder ? '1px solid #000' : '1px dashed #cbd5e1',
                           backgroundColor: '#ffffff',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
                           boxSizing: 'border-box'
                         }}
-                        dangerouslySetInnerHTML={{ __html: renderStickerInnerHtml(entry, idx + 1) }}
+                        dangerouslySetInnerHTML={{ __html: renderStickerInnerHtml(activeSnEntry, activePreviewIndex + 1, true) }}
+                      />
+                      <div
+                        style={{
+                          width: '185px',
+                          height: '92px',
+                          padding: '4px 6px',
+                          border: showBorder ? '1px solid #000' : '1px dashed #cbd5e1',
+                          backgroundColor: '#ffffff',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          boxSizing: 'border-box'
+                        }}
+                        dangerouslySetInnerHTML={{ 
+                          __html: renderStickerInnerHtml(
+                            selectedSnEntries[activePreviewIndex + 1] || activeSnEntry, 
+                            selectedSnEntries[activePreviewIndex + 1] ? activePreviewIndex + 2 : activePreviewIndex + 1, 
+                            true
+                          ) 
+                        }}
                       />
                     </div>
-                  ))}
-                </div>
-              ) : activeSnEntry ? (
-                /* SINGLE 1:1 ACCURATE PREVIEW */
-                <div className="flex flex-col items-center">
-                  <div 
-                    style={{
-                      width: `${sizeCfg.previewWidthPx}px`,
-                      height: `${sizeCfg.previewHeightPx}px`,
-                      padding: '8px 10px',
-                      border: showBorder ? '1.5px solid #000' : '1px dashed #cbd5e1',
-                      boxShadow: '0 8px 16px -2px rgba(0, 0, 0, 0.15)',
-                      backgroundColor: '#ffffff',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      boxSizing: 'border-box'
-                    }}
-                    dangerouslySetInnerHTML={{ __html: renderStickerInnerHtml(activeSnEntry, activePreviewIndex + 1) }}
-                  />
-                  <div className="text-[10px] text-slate-500 font-medium mt-2 flex items-center gap-1">
-                    <Check className="w-3 h-3 text-emerald-600" />
-                    <span>Format proporsi fisik 1:1 sesuai cetakan printer</span>
+                    <div className="text-[10px] text-slate-500 font-medium mt-2 flex items-center gap-1">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      <span>Ukuran 40x20mm (2 Line Sejajar) pas untuk Roll Thermal 80mm</span>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex flex-col items-center">
+                    <div 
+                      style={{
+                        width: `${sizeCfg.previewWidthPx}px`,
+                        height: `${sizeCfg.previewHeightPx}px`,
+                        padding: '8px 10px',
+                        border: showBorder ? '1.5px solid #000' : '1px dashed #cbd5e1',
+                        boxShadow: '0 8px 16px -2px rgba(0, 0, 0, 0.15)',
+                        backgroundColor: '#ffffff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        boxSizing: 'border-box'
+                      }}
+                      dangerouslySetInnerHTML={{ __html: renderStickerInnerHtml(activeSnEntry, activePreviewIndex + 1) }}
+                    />
+                    <div className="text-[10px] text-slate-500 font-medium mt-2 flex items-center gap-1">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      <span>Format proporsi fisik 1:1 sesuai cetakan printer</span>
+                    </div>
+                  </div>
+                )
               ) : null}
 
             </div>
@@ -1010,7 +1196,7 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
         {/* Modal Footer Bottom Action */}
         <div className="p-4 sm:p-5 border-t border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
           <div className="text-xs text-slate-600">
-            Target: <strong className="text-slate-900">{targetPrinter === 'thermal_roll' ? 'Roll Thermal 50x30mm' : 'Kertas Lembar A4'}</strong> | 
+            Target: <strong className="text-slate-900">{targetPrinter === 'thermal_roll' ? `Roll Thermal 80mm (${sizeCfg.label})` : 'Kertas Lembar A4'}</strong> | 
             Total: <strong className="text-purple-700">{totalStickerCount} Stiker</strong>
           </div>
           <div className="flex items-center gap-2">

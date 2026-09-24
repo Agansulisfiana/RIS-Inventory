@@ -84,13 +84,14 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
     switch (stickerSize) {
       case '40x20':
         return {
-          label: '40 x 20 mm',
-          desc: 'Label Mini (SN & Komponen Kecil)',
+          label: '40 x 20 mm (2 Line Roll 80mm)',
+          desc: 'Format 2 Kolom Sejajar (Printer Thermal Roll 80mm)',
           widthMm: '40mm',
           heightMm: '20mm',
           previewWidth: 'w-[260px]',
           previewMinHeight: 'min-h-[140px]',
-          fontSizeScale: 'text-[9px]'
+          fontSizeScale: 'text-[9px]',
+          isTwoLine: true
         };
       case '70x40':
         return {
@@ -100,18 +101,20 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
           heightMm: '40mm',
           previewWidth: 'w-[360px]',
           previewMinHeight: 'min-h-[220px]',
-          fontSizeScale: 'text-[11px]'
+          fontSizeScale: 'text-[11px]',
+          isTwoLine: false
         };
       case '50x30':
       default:
         return {
           label: '50 x 30 mm',
-          desc: 'Standar Thermal Label Satuan Unit',
+          desc: 'Standar Thermal Label Satuan Unit (Roll 80mm)',
           widthMm: '50mm',
           heightMm: '30mm',
           previewWidth: 'w-[310px]',
           previewMinHeight: 'min-h-[190px]',
-          fontSizeScale: 'text-[10px]'
+          fontSizeScale: 'text-[10px]',
+          isTwoLine: false
         };
     }
   };
@@ -120,16 +123,18 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
   const printDateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   // Generate single sticker HTML snippet for printing
-  const generateStickerHtml = () => {
+  const generateStickerHtml = (isTwoLine: boolean = false) => {
     const isMini = stickerSize === '40x20';
     const isLarge = stickerSize === '70x40';
+    const cardWidth = isTwoLine ? '38.5mm' : sizeCfg.widthMm;
+    const cardHeight = isTwoLine ? '19.5mm' : sizeCfg.heightMm;
 
     return `
       <div class="sticker-card" style="
-        width: ${sizeCfg.widthMm};
-        height: ${sizeCfg.heightMm};
+        width: ${cardWidth};
+        height: ${cardHeight};
         box-sizing: border-box;
-        padding: ${isMini ? '2mm' : isLarge ? '4mm' : '2.5mm'};
+        padding: ${isMini ? '1mm 1.4mm' : isLarge ? '4mm' : '2.5mm'};
         background: #ffffff;
         color: #000000;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -137,60 +142,58 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
         flex-direction: column;
         justify-content: space-between;
         overflow: hidden;
-        page-break-after: always;
-        break-after: page;
-        border: 1px dashed #cbd5e1;
-        margin-bottom: 3mm;
+        ${isTwoLine ? 'page-break-after: avoid; break-after: avoid;' : 'page-break-after: always; break-after: page;'}
+        border: 0.8px solid #000000;
       ">
         <!-- Top Header Info -->
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #000; padding-bottom: 1.5px; margin-bottom: 1.5px; font-size: ${isMini ? '6.5pt' : '7.5pt'}; font-weight: 800; line-height: 1.1;">
-          ${showCompany ? `<span style="text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;">${settings.companyName || 'PT REYCOM INTEGRATED SOLUSI'}</span>` : '<span></span>'}
-          ${showLocation ? `<span style="font-family: monospace; font-weight: 900; background: #000; color: #fff; padding: 1px 3px; border-radius: 2px;">${item.location || 'RAK-01'}</span>` : ''}
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 0.6px solid #000; padding-bottom: 0.5px; margin-bottom: 1px; font-size: ${isMini ? '5.2pt' : '7.5pt'}; font-weight: 800; line-height: 1.1;">
+          ${showCompany ? `<span style="text-transform: uppercase; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;">${settings.companyName || 'PT REYCOM INTEGRATED SOLUSI'}</span>` : '<span></span>'}
+          ${showLocation ? `<span style="font-family: monospace; font-weight: 900; background: #000; color: #fff; padding: 0.5px 2px; border-radius: 1px; font-size: ${isMini ? '4.8pt' : '6.5pt'};">${item.location || 'RAK-01'}</span>` : ''}
         </div>
 
         <!-- Product Name & Key Identifiers -->
         <div>
-          <div style="font-size: ${item.name.length > 50 ? (isMini ? '6pt' : '7pt') : (isMini ? '7pt' : isLarge ? '9.5pt' : '8pt')}; font-weight: 900; line-height: 1.15; color: #000; word-break: break-word; overflow-wrap: break-word;">
+          <div style="font-size: ${item.name.length > 40 ? (isMini ? '5.2pt' : '7pt') : (isMini ? '6.2pt' : isLarge ? '9.5pt' : '8pt')}; font-weight: 900; line-height: 1.1; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             ${item.name}
           </div>
-          <div style="display: flex; justify-content: space-between; font-size: ${isMini ? '6pt' : '6.5pt'}; color: #222; margin-top: 1px; font-family: monospace;">
+          <div style="display: flex; justify-content: space-between; font-size: ${isMini ? '5.2pt' : '6.5pt'}; color: #222; margin-top: 0.5px; font-family: monospace;">
             ${showSku ? `<span>SKU: <strong>${item.sku}</strong></span>` : ''}
             ${showSn ? `<span>SN: <strong>${serialNumberValue}</strong></span>` : ''}
           </div>
         </div>
 
         <!-- Barcode / QR Visual Representation -->
-        <div style="text-align: center; margin: 1.5px 0;">
+        <div style="text-align: center; margin: 0.5px 0;">
           ${stickerFormat === 'barcode_1d' ? `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-              <img src="${barcode1DDataUrl}" alt="Barcode 1D" style="width: 100%; max-height: ${isMini ? '24px' : isLarge ? '48px' : '36px'}; object-fit: contain; display: block;" />
-              <div style="font-family: monospace; font-size: ${isMini ? '6.5pt' : '7.5pt'}; font-weight: 900; letter-spacing: 0.14em; margin-top: 1px;">
+              <img src="${barcode1DDataUrl}" alt="Barcode 1D" style="width: 100%; max-height: ${isMini ? '15px' : isLarge ? '48px' : '36px'}; object-fit: contain; display: block;" />
+              <div style="font-family: monospace; font-size: ${isMini ? '5.2pt' : '7.5pt'}; font-weight: 900; letter-spacing: 0.08em; margin-top: 0.5px;">
                 ${barcodeValue}
               </div>
             </div>
           ` : stickerFormat === 'qr_code' ? `
-            <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
-              <img src="${qrCodeDataUrl}" alt="QR" style="height: ${isMini ? '28px' : isLarge ? '56px' : '44px'}; width: auto; object-fit: contain; display: block;" />
-              <div style="font-family: monospace; font-size: ${isMini ? '6pt' : '7pt'}; font-weight: 800; text-align: left;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 3px;">
+              <img src="${qrCodeDataUrl}" alt="QR" style="height: ${isMini ? '20px' : isLarge ? '56px' : '44px'}; width: auto; object-fit: contain; display: block;" />
+              <div style="font-family: monospace; font-size: ${isMini ? '5pt' : '7pt'}; font-weight: 800; text-align: left;">
                 <div>${barcodeValue}</div>
                 ${showSn ? `<div style="color: #444;">SN: ${serialNumberValue}</div>` : ''}
               </div>
             </div>
           ` : `
             <!-- Combination 1D + QR -->
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 3px;">
               <div style="flex: 1; text-align: left;">
-                <img src="${barcode1DDataUrl}" alt="Barcode" style="width: 100%; max-height: ${isMini ? '20px' : isLarge ? '38px' : '28px'}; object-fit: contain; display: block;" />
-                <div style="font-family: monospace; font-size: 6pt; font-weight: 800; letter-spacing: 0.1em; text-align: center;">${barcodeValue}</div>
+                <img src="${barcode1DDataUrl}" alt="Barcode" style="width: 100%; max-height: ${isMini ? '13px' : isLarge ? '38px' : '28px'}; object-fit: contain; display: block;" />
+                <div style="font-family: monospace; font-size: 5pt; font-weight: 800; letter-spacing: 0.05em; text-align: center;">${barcodeValue}</div>
               </div>
-              <img src="${qrCodeDataUrl}" alt="QR" style="height: ${isMini ? '24px' : isLarge ? '46px' : '34px'}; width: auto; object-fit: contain;" />
+              <img src="${qrCodeDataUrl}" alt="QR" style="height: ${isMini ? '16px' : isLarge ? '46px' : '34px'}; width: auto; object-fit: contain;" />
             </div>
           `}
         </div>
 
         <!-- Footer Strip -->
-        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #000; padding-top: 1px; font-size: ${isMini ? '5.5pt' : '6.5pt'}; color: #333;">
-          <span>${item.category || item.brand || 'Unit Satuan'}</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 0.6px solid #000; padding-top: 0.5px; font-size: ${isMini ? '4.8pt' : '6.5pt'}; color: #333;">
+          <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%;">${item.category || item.brand || 'Unit Satuan'}</span>
           ${showDate ? `<span>Tgl: ${printDateStr}</span>` : ''}
           ${showPrice ? `<span style="font-weight: 900; color: #000;">${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(item.price)}</span>` : ''}
         </div>
@@ -199,11 +202,51 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
   };
 
   const handlePrint = () => {
-    const singleSticker = generateStickerHtml();
+    const isTwoLine = stickerSize === '40x20';
     const count = Math.max(1, copies);
     let allStickersHtml = '';
-    for (let i = 0; i < count; i++) {
-      allStickersHtml += singleSticker;
+
+    if (isTwoLine) {
+      const singleSticker = generateStickerHtml(true);
+      for (let i = 0; i < count; i += 2) {
+        const hasSecond = i + 1 < count;
+        allStickersHtml += `
+          <div class="thermal-row-80mm" style="
+            width: 80mm;
+            height: 20mm;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            padding: 0 1mm;
+            page-break-after: always;
+            break-after: page;
+            overflow: hidden;
+          ">
+            ${singleSticker}
+            ${hasSecond ? singleSticker : '<div style="width: 38.5mm; height: 19.5mm; visibility: hidden;"></div>'}
+          </div>
+        `;
+      }
+    } else {
+      const singleSticker = generateStickerHtml(false);
+      for (let i = 0; i < count; i++) {
+        allStickersHtml += `
+          <div class="thermal-row-80mm" style="
+            width: 80mm;
+            height: ${sizeCfg.heightMm};
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+            page-break-after: always;
+            break-after: page;
+            overflow: hidden;
+          ">
+            ${singleSticker}
+          </div>
+        `;
+      }
     }
 
     const html = `
@@ -214,18 +257,24 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
           <title>Stiker Barcode Satuan - ${item.name}</title>
           <style>
             @page {
-              size: ${sizeCfg.widthMm} ${sizeCfg.heightMm};
+              size: 80mm ${sizeCfg.heightMm};
               margin: 0;
             }
             body {
               margin: 0;
               padding: 0;
+              width: 80mm;
               background: #fff;
               -webkit-print-color-adjust: exact;
               print-color-adjust: exact;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+            .thermal-row-80mm {
+              margin: 0 !important;
+              page-break-after: always !important;
+              break-after: page !important;
             }
             .sticker-card {
-              border: none !important;
               margin: 0 !important;
             }
             @media screen {
@@ -236,8 +285,9 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
                 flex-direction: column;
                 align-items: center;
               }
-              .sticker-card {
-                border: 1px solid #cbd5e1 !important;
+              .thermal-row-80mm {
+                background: #fff;
+                border: 1px dashed #94a3b8 !important;
                 margin-bottom: 10px !important;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.05);
               }
@@ -326,8 +376,8 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
               </label>
               <div className="space-y-1.5">
                 {[
-                  { id: '50x30', label: '50 x 30 mm', badge: 'Standar Thermal Satuan', desc: 'Cocok untuk body unit & kardus satuan' },
-                  { id: '40x20', label: '40 x 20 mm', badge: 'Ukuran Mini', desc: 'Cocok untuk serial number & sparepart kecil' },
+                  { id: '40x20', label: '40 x 20 mm', badge: '2 Line (Roll 80mm)', desc: '2 baris sejajar untuk printer thermal roll ukuran 80mm' },
+                  { id: '50x30', label: '50 x 30 mm', badge: 'Roll 80mm / Satuan', desc: 'Standar thermal roll ukuran 80mm & satuan unit' },
                   { id: '70x40', label: '70 x 40 mm', badge: 'Ukuran Box Besar', desc: 'Cocok untuk kardus pengiriman ekspedisi' }
                 ].map((sz) => (
                   <button
