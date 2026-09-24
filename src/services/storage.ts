@@ -1253,7 +1253,7 @@ class StorageService {
     return false;
   }
 
-  adjustItemStock(id: string, delta: number, type: StockMovementType | 'Penjualan' | 'Pembelian' | 'Masuk' | 'Keluar' | 'Opname Adjustment', reason: string, user?: User, warehouse?: string): boolean {
+  adjustItemStock(id: string, delta: number, type: StockMovementType | 'Penjualan' | 'Pembelian' | 'Masuk' | 'Keluar' | 'Opname Adjustment', reason: string, user?: User, warehouse?: string, serialNumbersIn?: string[], serialNumbersOut?: string[]): boolean {
     try { this.ensurePermission(user, 'canEditProducts'); } catch (e) { throw e; }
     const items = this.getItems();
     const idx = items.findIndex(i => i.id === id);
@@ -1277,6 +1277,29 @@ class StorageService {
       item.status = 'terjual';
     } else if (item.status === 'terjual' && newQty > 0) {
       item.status = 'tersedia';
+    }
+
+    // --- Serial Number Tracking ---
+    if (delta > 0 && serialNumbersIn && serialNumbersIn.length > 0) {
+      // Append incoming SNs to the serialNumbers array (avoid duplicates)
+      const existing = Array.isArray(item.serialNumbers) ? [...item.serialNumbers] : [];
+      const existingSet = new Set(existing.map(s => s.trim().toLowerCase()));
+      const newSns = serialNumbersIn.filter(s => s.trim() && !existingSet.has(s.trim().toLowerCase()));
+      item.serialNumbers = [...existing, ...newSns];
+      // Keep primary serialNumber in sync with first SN
+      if (item.serialNumbers.length > 0) item.serialNumber = item.serialNumbers[0];
+    } else if (delta < 0) {
+      // FIFO: remove the oldest SNs from the front of the array
+      const existing = Array.isArray(item.serialNumbers) ? [...item.serialNumbers] : [];
+      const removeCount = Math.abs(delta);
+      // If explicit SNs to remove were given, prefer those; otherwise take from front (FIFO)
+      if (serialNumbersOut && serialNumbersOut.length > 0) {
+        const removeSet = new Set(serialNumbersOut.map(s => s.trim().toLowerCase()));
+        item.serialNumbers = existing.filter(s => !removeSet.has(s.trim().toLowerCase()));
+      } else {
+        item.serialNumbers = existing.slice(removeCount);
+      }
+      if (item.serialNumbers.length > 0) item.serialNumber = item.serialNumbers[0];
     }
 
     // determine warehouse to apply change
