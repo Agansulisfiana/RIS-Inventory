@@ -179,18 +179,73 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
     );
   }
 
-  // Generic fallback info in Settings
+  // Generic fallback info in Settings: render sleek action button that opens guidance modal
   if (variant === 'settings') {
     return (
-      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
-        <div className="font-bold text-slate-800 mb-1 flex items-center gap-1.5">
-          <Smartphone className="w-3.5 h-3.5 text-blue-600" />
-          <span>Aplikasi Lapangan (PWA Ready)</span>
-        </div>
-        <div>
-          Buka situs ini di Chrome (Android/Windows/Mac) atau Safari (iOS), lalu pilih <em>&ldquo;Tambahkan ke Layar Utama&rdquo;</em> untuk menginstal aplikasi layaknya aplikasi native tanpa URL bar.
-        </div>
-      </div>
+      <>
+        <button
+          type="button"
+          onClick={() => setShowIOSGuide(true)}
+          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition-all cursor-pointer ${className}`}
+        >
+          <Smartphone className="w-4 h-4 text-blue-300" />
+          <span>Petunjuk Pasang di HP</span>
+        </button>
+
+        {showIOSGuide && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-slate-200 text-slate-800 animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-sm">Pasang Aplikasi Lapangan</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowIOSGuide(false)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="py-4 space-y-3.5 text-xs text-slate-600">
+                <p className="font-medium text-slate-700">
+                  Untuk menginstal aplikasi ini ke layar utama HP / Tablet:
+                </p>
+
+                <div className="flex items-start gap-3 p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                    1
+                  </div>
+                  <div>
+                    <strong>Di Chrome / Android:</strong> Ketuk tombol titik tiga di sudut kanan atas browser, lalu pilih <strong>&ldquo;Install app&rdquo;</strong> atau <strong>&ldquo;Tambahkan ke Layar Utama&rdquo;</strong>.
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                    2
+                  </div>
+                  <div>
+                    <strong>Di Safari / iPhone:</strong> Ketuk tombol <strong>Share (Bagikan)</strong> di bilah bawah Safari, lalu pilih <strong>&ldquo;Add to Home Screen&rdquo;</strong>.
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowIOSGuide(false)}
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition-colors cursor-pointer"
+              >
+                Mengerti
+              </button>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
