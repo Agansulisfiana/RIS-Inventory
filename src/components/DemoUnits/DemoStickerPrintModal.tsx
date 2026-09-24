@@ -633,7 +633,7 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/65 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 my-auto flex flex-col max-h-[92vh]">
+      <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-6xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 my-auto flex flex-col max-h-[92vh]">
         
         {/* Top Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
@@ -670,39 +670,56 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
           <div className="lg:col-span-7 space-y-4">
             
             {/* 1. SELEKSI TARGET PRINTER */}
-            <div className="p-3 bg-purple-50/60 border border-purple-200 rounded-xl space-y-2">
+            <div className="p-3.5 bg-purple-50/60 border border-purple-200 rounded-xl space-y-2.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-black text-purple-950 flex items-center gap-1.5">
                   <Printer className="w-3.5 h-3.5 text-purple-600" />
                   <span>Target Jenis Printer:</span>
                 </label>
-                <span className="text-[10px] font-bold text-purple-700">
+                <span className="text-[10px] font-bold text-purple-700 bg-purple-100/70 border border-purple-200 px-2 py-0.5 rounded-md">
                   {targetPrinter === 'thermal_roll' ? 'Printer Thermal Roll (Ukuran 80)' : 'Format Lembar Kertas A4'}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setTargetPrinter('thermal_roll')}
-                  className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${targetPrinter === 'thermal_roll' ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-1 ring-purple-600/30' : 'bg-white text-slate-700 border-purple-200 hover:bg-purple-100/50'}`}
+                  className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
+                    targetPrinter === 'thermal_roll' 
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-600/30' 
+                      : 'bg-white text-slate-700 border-purple-200 hover:bg-purple-50'
+                  }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="text-[11px] font-bold">1. Printer Thermal Label (Roll 80)</div>
-                    <span className={`text-[9px] font-black px-1.5 py-0.2 rounded ${targetPrinter === 'thermal_roll' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-xs font-bold">1. Printer Thermal Label (Roll 80)</div>
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                      targetPrinter === 'thermal_roll' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'
+                    }`}>
                       Ukuran 80
                     </span>
                   </div>
-                  <div className={`text-[10px] mt-0.5 ${targetPrinter === 'thermal_roll' ? 'text-purple-100' : 'text-slate-500'}`}>
-                    Lebar Roll 80mm (Format 40x20 2-Line & 50x30)
+                  <div className={`text-[11px] font-medium ${targetPrinter === 'thermal_roll' ? 'text-purple-100' : 'text-slate-500'}`}>
+                    Lebar Roll 80mm
                   </div>
                 </button>
                 <button
                   type="button"
                   onClick={() => setTargetPrinter('sheet_a4')}
-                  className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${targetPrinter === 'sheet_a4' ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-1 ring-purple-600/30' : 'bg-white text-slate-700 border-purple-200 hover:bg-purple-100/50'}`}
+                  className={`p-3 rounded-xl text-left border transition-all cursor-pointer ${
+                    targetPrinter === 'sheet_a4' 
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-600/30' 
+                      : 'bg-white text-slate-700 border-purple-200 hover:bg-purple-50'
+                  }`}
                 >
-                  <div className="text-[11px] font-bold">2. Printer Standar (Lembar A4)</div>
-                  <div className={`text-[10px] mt-0.5 ${targetPrinter === 'sheet_a4' ? 'text-purple-100' : 'text-slate-500'}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-xs font-bold">2. Printer Standar (Lembar A4)</div>
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                      targetPrinter === 'sheet_a4' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      Kertas A4
+                    </span>
+                  </div>
+                  <div className={`text-[11px] font-medium ${targetPrinter === 'sheet_a4' ? 'text-purple-100' : 'text-slate-500'}`}>
                     Grid berjejer rapi di kertas HVS / Stiker A4
                   </div>
                 </button>
@@ -838,38 +855,42 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
               </div>
             </div>
 
-            {/* 3. HEADER & NAMA PRODUK */}
-            <div className="space-y-3">
-              {/* Header */}
+            {/* 3. DETAIL KONTEN & IDENTITAS STIKER */}
+            <div className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                  <Edit3 className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Detail Informasi Stiker</span>
+                </span>
+                <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={showBadge}
+                    onChange={(e) => setShowBadge(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                  />
+                  <span>Tampilkan Badge DEMO #1</span>
+                </label>
+              </div>
+
+              {/* Header Nama Perusahaan */}
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                    <Building2 className="w-3.5 h-3.5 text-purple-600" />
-                    <span>Header / Nama Perusahaan</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={showBadge}
-                      onChange={(e) => setShowBadge(e.target.checked)}
-                      className="w-3.5 h-3.5 rounded text-purple-600"
-                    />
-                    <span>Tampilkan Badge DEMO #1</span>
-                  </label>
-                </div>
+                <label className="text-[11px] font-bold text-slate-700 block">
+                  Header / Nama Perusahaan
+                </label>
                 <input
                   type="text"
                   value={headerText}
                   onChange={(e) => setHeaderText(e.target.value)}
                   placeholder="PROPERTY OF PT..."
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white shadow-2xs"
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
                 />
               </div>
 
               {/* Nama Produk & SKU */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div className="sm:col-span-2 space-y-1">
-                  <label className="text-xs font-bold text-slate-800">
+                  <label className="text-[11px] font-bold text-slate-700 block">
                     Nama Barang / Model
                   </label>
                   <input
@@ -877,11 +898,11 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
                     placeholder="Nama printer/perangkat..."
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white shadow-2xs"
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-800">
+                  <label className="text-[11px] font-bold text-slate-700 block">
                     SKU / Kode
                   </label>
                   <input
@@ -889,85 +910,92 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
                     value={skuCode}
                     onChange={(e) => setSkuCode(e.target.value)}
                     placeholder="SKU-XXXX"
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white shadow-2xs"
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
                   />
                 </div>
               </div>
 
-              {/* Keterangan Tambahan / Customer Note */}
+              {/* Catatan Bawah */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-800">
-                  Catatan Bawah / Footer (Customer & Batas Kembali)
+                <label className="text-[11px] font-bold text-slate-700 block">
+                  Catatan Bawah / Footer (Customer &amp; Batas Kembali)
                 </label>
                 <input
                   type="text"
                   value={customNotes}
                   onChange={(e) => setCustomNotes(e.target.value)}
                   placeholder="Cust: PT RDS (s/d 24 Sep 2026)"
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white shadow-2xs"
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
                 />
               </div>
             </div>
 
             {/* 4. UKURAN & FORMAT BARCODE */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-800">
-                  Format Barcode
-                </label>
-                <div className="grid grid-cols-3 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setBarcodeType('qr_code')}
-                    className={`py-1 px-1.5 rounded-lg text-[10px] font-bold flex flex-col items-center gap-1 border transition-all cursor-pointer ${barcodeType === 'qr_code' ? 'bg-purple-50 border-purple-500 text-purple-700 ring-1 ring-purple-500' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-                  >
-                    <QrCode className="w-3.5 h-3.5" />
-                    <span>QR Code</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBarcodeType('barcode_1d')}
-                    className={`py-1 px-1.5 rounded-lg text-[10px] font-bold flex flex-col items-center gap-1 border transition-all cursor-pointer ${barcodeType === 'barcode_1d' ? 'bg-purple-50 border-purple-500 text-purple-700 ring-1 ring-purple-500' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-                  >
-                    <BarcodeIcon className="w-3.5 h-3.5" />
-                    <span>1D Barcode</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBarcodeType('combination')}
-                    className={`py-1 px-1.5 rounded-lg text-[10px] font-bold flex flex-col items-center gap-1 border transition-all cursor-pointer ${barcodeType === 'combination' ? 'bg-purple-50 border-purple-500 text-purple-700 ring-1 ring-purple-500' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Kombinasi</span>
-                  </button>
-                </div>
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+              <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-purple-600" />
+                <span>Pengaturan Barcode &amp; Ukuran Label</span>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-800">
-                  Ukuran Label Thermal
-                </label>
-                <select
-                  value={stickerSize}
-                  onChange={(e) => setStickerSize(e.target.value as StickerSize)}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-2xs cursor-pointer"
-                >
-                  <option value="40x20">40 x 20 mm (2 Line / Roll 80mm)</option>
-                  <option value="50x30">50 x 30 mm (Standar Satuan Roll 80mm)</option>
-                  <option value="60x40">60 x 40 mm (Ukuran Sedang / Lega)</option>
-                  <option value="70x40">70 x 40 mm (Kardus / Box Luar)</option>
-                </select>
-                <div className="flex items-center justify-between text-[10px] text-slate-500">
-                  <span>{sizeCfg.desc}</span>
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={showBorder}
-                      onChange={(e) => setShowBorder(e.target.checked)}
-                      className="w-3 h-3 rounded text-purple-600"
-                    />
-                    <span>Bingkai</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 block">
+                    Format Barcode
                   </label>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setBarcodeType('qr_code')}
+                      className={`py-1.5 px-1.5 rounded-lg text-[10px] font-bold flex flex-col items-center gap-1 border transition-all cursor-pointer ${barcodeType === 'qr_code' ? 'bg-purple-50 border-purple-500 text-purple-700 ring-1 ring-purple-500' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>QR Code</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBarcodeType('barcode_1d')}
+                      className={`py-1.5 px-1.5 rounded-lg text-[10px] font-bold flex flex-col items-center gap-1 border transition-all cursor-pointer ${barcodeType === 'barcode_1d' ? 'bg-purple-50 border-purple-500 text-purple-700 ring-1 ring-purple-500' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      <BarcodeIcon className="w-3.5 h-3.5" />
+                      <span>1D Barcode</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBarcodeType('combination')}
+                      className={`py-1.5 px-1.5 rounded-lg text-[10px] font-bold flex flex-col items-center gap-1 border transition-all cursor-pointer ${barcodeType === 'combination' ? 'bg-purple-50 border-purple-500 text-purple-700 ring-1 ring-purple-500' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Kombinasi</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 block">
+                    Ukuran Label Thermal
+                  </label>
+                  <select
+                    value={stickerSize}
+                    onChange={(e) => setStickerSize(e.target.value as StickerSize)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-2xs cursor-pointer"
+                  >
+                    <option value="40x20">40 x 20 mm (2 Line / Roll 80mm)</option>
+                    <option value="50x30">50 x 30 mm (Standar Satuan Roll 80mm)</option>
+                    <option value="60x40">60 x 40 mm (Ukuran Sedang / Lega)</option>
+                    <option value="70x40">70 x 40 mm (Kardus / Box Luar)</option>
+                  </select>
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                    <span className="truncate pr-1">{sizeCfg.desc}</span>
+                    <label className="flex items-center gap-1 cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={showBorder}
+                        onChange={(e) => setShowBorder(e.target.checked)}
+                        className="w-3 h-3 rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                      />
+                      <span>Bingkai</span>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -992,7 +1020,7 @@ export const DemoStickerPrintModal: React.FC<DemoStickerPrintModalProps> = ({
                   <Layers className="w-3 h-3" />
                   <span>{previewAllMode ? 'Mode Tunggal' : `Lihat Semua (${selectedSnEntries.length})`}</span>
                 </button>
-                <span className="font-mono font-bold text-[10px] text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md">
+                <span className="font-mono font-bold text-[10px] text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md whitespace-nowrap shrink-0">
                   {sizeCfg.label}
                 </span>
               </div>
